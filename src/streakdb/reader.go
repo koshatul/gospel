@@ -1,6 +1,10 @@
 package streakdb
 
-import "context"
+import (
+	"context"
+
+	"github.com/jmalloc/streakdb/src/driver"
+)
 
 // Reader is an interface for reading facts from a stream.
 type Reader interface {
@@ -25,4 +29,25 @@ type Reader interface {
 
 	// Close closes the reader.
 	Close() error
+}
+
+// ReaderOption is a function that applies a reader option to a ReaderOptions
+// struct.
+type ReaderOption func(o *driver.ReaderOptions)
+
+// FilterByEventType is a reader option that limits the reader to facts with
+// events of a specific type.
+//
+// Multiple FilterByEventType options can be combined to expand the list of
+// allowed types.
+func FilterByEventType(types ...string) ReaderOption {
+	return func(o *driver.ReaderOptions) {
+		if o.EventTypes == nil {
+			o.EventTypes = map[string]struct{}{}
+		}
+
+		for _, t := range types {
+			o.EventTypes[t] = struct{}{}
+		}
+	}
 }
