@@ -1,14 +1,20 @@
 hash: 97207fe6608af0a98c77e5e7019c3309c81d33fed6e12e8aa5bb74362fd87028
-updated: 2018-02-22T17:05:06.844033+10:00
+updated: 2018-02-22T18:24:04.519359+10:00
 imports:
 - name: github.com/go-sql-driver/mysql
   version: bc14601d1bd56421dd60f561e6052c9ed77f9daf
 - name: github.com/uber-go/multierr
   version: 3c4937480c32f4c13a875a1829af76c98ca3d40a
+- name: go.uber.org/atomic
+  version: 8474b86a5a6f79c443ce4b2992817ff32cf208b8
 - name: golang.org/x/time
   version: 6dc17368e09b0e8634d71cac8168d853e869a0c7
   subpackages:
   - rate
+- name: google.golang.org/appengine
+  version: 5bee14b453b4c71be47ec1781b0fa61c2ea182db
+  subpackages:
+  - cloudsql
 testImports:
 - name: github.com/onsi/ginkgo
   version: 9eda700730cba42af70d53180f9dcce9266bc2bc
