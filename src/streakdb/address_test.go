@@ -24,22 +24,26 @@ var _ = Describe("Address", func() {
 	})
 
 	Describe("String", func() {
-		It("describes stream name and the offset", func() {
+		It("includes the stream name and offset", func() {
 			addr := Address{
 				Stream: "test-stream",
 				Offset: 123,
 			}
 
-			Expect(addr.String()).To(Equal("test-stream+123"))
+			Expect(addr.String()).To(Equal(
+				"test-stream+123",
+			))
 		})
 
-		It("does not return an empty name for the ε-stream", func() {
+		It("does not use an empty string for the ε-stream", func() {
 			addr := Address{
 				Stream: "",
 				Offset: 123,
 			}
 
-			Expect(addr.String()).To(Equal("ε+123"))
+			Expect(addr.String()).To(Equal(
+				"ε+123",
+			))
 		})
 	})
 })

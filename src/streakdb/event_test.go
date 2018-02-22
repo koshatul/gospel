@@ -9,13 +9,15 @@ import (
 var _ = Describe("Event", func() {
 	Describe("String", func() {
 		It("describes the event by its type", func() {
-			addr := Event{
+			ev := Event{
 				EventType:   "event-type",
 				ContentType: "text/plain",
 				Body:        []byte("Hello, world!"),
 			}
 
-			Expect(addr.String()).To(Equal("event-type!"))
+			Expect(ev.String()).To(Equal(
+				"event-type!",
+			))
 		})
 	})
 })
