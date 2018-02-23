@@ -169,6 +169,41 @@ var _ = Describe("EventStore", func() {
 				)
 			}).To(Panic())
 		})
+
+		It("does not produce any facts when there is a conflict", func() {
+			// append event at +0
+			_, err := store.Append(
+				ctx,
+				streakdb.Address{
+					Stream: "test-stream",
+					Offset: 0,
+				},
+				streakdb.Event{},
+			)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			// append a second event at +0, expected to conflict
+			_, err = store.Append(
+				ctx,
+				streakdb.Address{
+					Stream: "test-stream",
+					Offset: 0,
+				},
+				streakdb.Event{},
+			)
+			Expect(streakdb.IsConflict(err)).To(BeTrue())
+
+			// append a second event at +1, expected to still be unused
+			_, err = store.Append(
+				ctx,
+				streakdb.Address{
+					Stream: "test-stream",
+					Offset: 1,
+				},
+				streakdb.Event{},
+			)
+			Expect(err).ShouldNot(HaveOccurred())
+		})
 	})
 
 	Describe("AppendUnchecked", func() {
