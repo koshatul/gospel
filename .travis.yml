@@ -1,0 +1,9 @@
+language: go
+go: '1.9'
+services:
+- mariadb
+env:
+- STREAKDB_MARIADB_TEST_DSN="travis@tcp(127.0.0.1:3306)/streakdb"
+before_install: mysql -e 'CREATE DATABASE streakdb;'
+script: make ci
+after_script: bash <(curl -s https://codecov.io/bash)
