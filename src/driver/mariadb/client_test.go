@@ -1,50 +1,18 @@
-// +build !without_mariadb,!without_functests
+// +build !without_mariadb
 
 package mariadb_test
 
 import (
 	"database/sql"
-	"os"
 
-	"github.com/go-sql-driver/mysql"
 	. "github.com/jmalloc/streakdb/src/driver/mariadb"
+	"github.com/jmalloc/streakdb/src/streakdb"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-func testDSN() string {
-	dsn := os.Getenv("STREAKDB_MARIADB_TEST_DSN")
-	if dsn != "" {
-		return dsn
-	}
-
-	return "streakdb:streakdb@tcp(127.0.0.1:3306)/streakdb"
-}
-
-func tearDown() {
-	cfg, err := mysql.ParseDSN(testDSN())
-	if err != nil {
-		panic(err)
-	}
-
-	db, err := sql.Open("mysql", testDSN())
-	if err != nil {
-		panic(err)
-	}
-
-	_, err = db.Exec(`DROP SCHEMA ` + cfg.DBName)
-	if err != nil {
-		panic(err)
-	}
-
-	_, err = db.Exec(`CREATE SCHEMA IF NOT EXISTS ` + cfg.DBName)
-	if err != nil {
-		panic(err)
-	}
-}
-
 var _ = Describe("Open", func() {
-	AfterEach(tearDown)
+	AfterEach(destroyTestSchema)
 
 	It("returns a client", func() {
 		c, err := Open(testDSN())
@@ -76,5 +44,37 @@ var _ = Describe("Open", func() {
 		}
 
 		Expect(tables).To(ConsistOf("event", "fact"))
+	})
+})
+
+var _ = Describe("Client", func() {
+	var client *Client
+
+	BeforeEach(func() {
+		var err error
+		client, err = Open(testDSN())
+		Expect(err).ShouldNot(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		if client != nil {
+			client.Close()
+		}
+		destroyTestSchema()
+	})
+
+	Describe("GetStore", func() {
+		It("returns a streakdb.EventStore", func() {
+			var es streakdb.EventStore // static interface check
+			es, err := client.GetStore("store0")
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(es).NotTo(BeNil())
+		})
+
+		It("returns an error if the client is closed", func() {
+			client.Close()
+			_, err := client.GetStore("store0")
+			Expect(err).Should(HaveOccurred())
+		})
 	})
 })

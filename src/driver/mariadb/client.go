@@ -12,6 +12,8 @@ import (
 //
 // Each server supports an arbitrary number of named event stores.
 type Client struct {
+	// db is the pool of MariaDB connections used by the event stores accessed
+	// through this client.
 	db *sql.DB
 }
 
@@ -42,6 +44,15 @@ func Open(dsn string) (*Client, error) {
 	}
 
 	return &Client{db}, nil
+}
+
+// GetStore returns an event store by name.
+func (c *Client) GetStore(name string) (*EventStore, error) {
+	if err := c.db.Ping(); err != nil {
+		return nil, err
+	}
+
+	return &EventStore{c.db, name}, nil
 }
 
 // Close closes the database connection.

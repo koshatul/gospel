@@ -2,7 +2,7 @@ package streakdb
 
 import "context"
 
-// EventStore is an interface for interacting with an event store.
+// EventStore is an interface for reading and writing streams of events.
 type EventStore interface {
 	// Append atomically writes one or more events to the end of a stream,
 	// producing a contiguous block of facts.
