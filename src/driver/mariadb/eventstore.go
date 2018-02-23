@@ -29,7 +29,8 @@ func (es *EventStore) Append(
 	addr streakdb.Address,
 	ev ...streakdb.Event,
 ) (streakdb.Address, error) {
-	panic("not implemented")
+	err := es.append(ctx, &addr, ev, appendChecked)
+	return addr, err
 }
 
 // AppendUnchecked atomically writes one or more events to the end of a
@@ -47,7 +48,9 @@ func (es *EventStore) AppendUnchecked(
 	stream string,
 	ev ...streakdb.Event,
 ) (streakdb.Address, error) {
-	panic("not implemented")
+	addr := streakdb.Address{Stream: stream}
+	err := es.append(ctx, &addr, ev, appendUnchecked)
+	return addr, err
 }
 
 // Open returns a reader that begins reading facts at addr.
@@ -56,4 +59,41 @@ func (es *EventStore) Open(
 	opts ...streakdb.ReaderOption,
 ) (streakdb.Reader, error) {
 	panic("not implemented")
+}
+
+// append writes events to a stream using the given append strategy.
+//
+// If a deadlock occurs (which can occur for a single statement when using
+// InnoDB!) the append is retried. There is no limit on the retries other than
+// the context deadline.
+func (es *EventStore) append(
+	ctx context.Context,
+	addr *streakdb.Address,
+	events []streakdb.Event,
+	strategy appendStrategy,
+) error {
+	if addr.Stream == "" {
+		panic("can not append to the ε-stream")
+	}
+
+	count := len(events)
+
+	if count == 0 {
+		panic("no events provided")
+	}
+
+	for {
+		err := atomicAppend(
+			ctx,
+			es.db,
+			es.name,
+			addr,
+			events,
+			strategy,
+		)
+
+		if !isDeadlock(err) {
+			return err
+		}
+	}
 }

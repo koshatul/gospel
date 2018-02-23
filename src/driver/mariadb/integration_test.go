@@ -7,10 +7,11 @@ import (
 	"os"
 
 	"github.com/go-sql-driver/mysql"
+	"github.com/jmalloc/streakdb/src/driver/mariadb"
 )
 
-// testDSN returns the MariaDB DSN used for integration tests.
-func testDSN() string {
+// getTestDSN returns the MariaDB DSN used for integration tests.
+func getTestDSN() string {
 	dsn := os.Getenv("STREAKDB_MARIADB_TEST_DSN")
 	if dsn != "" {
 		return dsn
@@ -19,15 +20,41 @@ func testDSN() string {
 	return "streakdb:streakdb@tcp(127.0.0.1:3306)/streakdb"
 }
 
-// destroyTestSchema removes all tables and procedures from the the database
-// schema specified by testDSN().
-func destroyTestSchema() {
-	cfg, err := mysql.ParseDSN(testDSN())
+// getTestClient returns a Client that uses the test DSN.
+func getTestClient() *mariadb.Client {
+	c, err := mariadb.Open(getTestDSN())
 	if err != nil {
 		panic(err)
 	}
 
-	db, err := sql.Open("mysql", testDSN())
+	return c
+}
+
+// getTestStore returns a Client that uses the test DSN.
+func getTestStore() (*mariadb.Client, *mariadb.EventStore) {
+	c, err := mariadb.Open(getTestDSN())
+	if err != nil {
+		panic(err)
+	}
+
+	es, err := c.GetStore("test")
+	if err != nil {
+		c.Close()
+		panic(err)
+	}
+
+	return c, es
+}
+
+// destroyTestSchema removes all tables and procedures from the the database
+// schema specified by getTestDSN().
+func destroyTestSchema() {
+	cfg, err := mysql.ParseDSN(getTestDSN())
+	if err != nil {
+		panic(err)
+	}
+
+	db, err := sql.Open("mysql", getTestDSN())
 	if err != nil {
 		panic(err)
 	}

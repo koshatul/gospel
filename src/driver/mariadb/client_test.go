@@ -15,7 +15,7 @@ var _ = Describe("Open", func() {
 	AfterEach(destroyTestSchema)
 
 	It("returns a client", func() {
-		c, err := Open(testDSN())
+		c, err := Open(getTestDSN())
 
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(c).NotTo(BeNil())
@@ -24,11 +24,11 @@ var _ = Describe("Open", func() {
 	})
 
 	It("creates the schema", func() {
-		c, err := Open(testDSN())
+		c, err := Open(getTestDSN())
 		Expect(err).ShouldNot(HaveOccurred())
 		defer c.Close()
 
-		db, err := sql.Open("mysql", testDSN())
+		db, err := sql.Open("mysql", getTestDSN())
 		Expect(err).ShouldNot(HaveOccurred())
 
 		rows, err := db.Query("SHOW TABLES")
@@ -51,15 +51,11 @@ var _ = Describe("Client", func() {
 	var client *Client
 
 	BeforeEach(func() {
-		var err error
-		client, err = Open(testDSN())
-		Expect(err).ShouldNot(HaveOccurred())
+		client = getTestClient()
 	})
 
 	AfterEach(func() {
-		if client != nil {
-			client.Close()
-		}
+		client.Close()
 		destroyTestSchema()
 	})
 
