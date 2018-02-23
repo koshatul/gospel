@@ -4,13 +4,19 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/jmalloc/streakdb/src/driver"
 	"github.com/jmalloc/streakdb/src/streakdb"
+	"golang.org/x/time/rate"
 )
 
 // EventStore an interface for reading and writing streams of events stored in
 // a MariaDB database.
 type EventStore struct {
-	db   *sql.DB
+	// db is the pool of MariaDB connections used by the event stores and the
+	// readers it creates.
+	db *sql.DB
+
+	// name is the name of the store.
 	name string
 }
 
@@ -58,7 +64,23 @@ func (es *EventStore) Open(
 	addr streakdb.Address,
 	opts ...streakdb.ReaderOption,
 ) (streakdb.Reader, error) {
-	panic("not implemented")
+	var o driver.ReaderOptions
+
+	for _, fn := range opts {
+		fn(&o)
+	}
+
+	if o.EventTypes != nil {
+		panic("event type filtering is not supported")
+	}
+
+	return newReader(
+		es.db,
+		rate.NewLimiter(rate.Inf, 1), // TODO: use reader option
+		es.name,
+		10, // lookahead -- TODO: use reader option
+		addr,
+	), nil
 }
 
 // append writes events to a stream using the given append strategy.

@@ -6,7 +6,7 @@ import (
 	"github.com/jmalloc/streakdb/src/driver"
 )
 
-// Reader is an interface for reading facts from a stream.
+// Reader is an interface for reading facts from a stream in order.
 type Reader interface {
 	// Next blocks until a fact is available for reading or ctx is canceled.
 	//

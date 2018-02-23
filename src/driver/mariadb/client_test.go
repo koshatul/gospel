@@ -3,8 +3,6 @@
 package mariadb_test
 
 import (
-	"database/sql"
-
 	. "github.com/jmalloc/streakdb/src/driver/mariadb"
 	"github.com/jmalloc/streakdb/src/streakdb"
 	. "github.com/onsi/ginkgo"
@@ -21,29 +19,6 @@ var _ = Describe("Open", func() {
 		Expect(c).NotTo(BeNil())
 
 		c.Close()
-	})
-
-	It("creates the schema", func() {
-		c, err := Open(getTestDSN())
-		Expect(err).ShouldNot(HaveOccurred())
-		defer c.Close()
-
-		db, err := sql.Open("mysql", getTestDSN())
-		Expect(err).ShouldNot(HaveOccurred())
-
-		rows, err := db.Query("SHOW TABLES")
-		Expect(err).ShouldNot(HaveOccurred())
-
-		var tables []string
-		for rows.Next() {
-			var t string
-			err := rows.Scan(&t)
-			Expect(err).ShouldNot(HaveOccurred())
-
-			tables = append(tables, t)
-		}
-
-		Expect(tables).To(ConsistOf("event", "fact"))
 	})
 })
 
@@ -62,15 +37,15 @@ var _ = Describe("Client", func() {
 	Describe("GetStore", func() {
 		It("returns a streakdb.EventStore", func() {
 			var es streakdb.EventStore // static interface check
-			es, err := client.GetStore("store0")
+			es, err := client.GetStore("test")
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(es).NotTo(BeNil())
 		})
 
 		It("returns an error if the client is closed", func() {
 			client.Close()
-			_, err := client.GetStore("store0")
-			Expect(err).Should(HaveOccurred())
+			_, err := client.GetStore("test")
+			Expect(err).Should(MatchError("sql: database is closed"))
 		})
 	})
 })

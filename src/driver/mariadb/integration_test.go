@@ -30,13 +30,9 @@ func getTestClient() *mariadb.Client {
 	return c
 }
 
-// getTestStore returns a Client that uses the test DSN.
+// getTestStore returns an EventStore that uses the test DSN.
 func getTestStore() (*mariadb.Client, *mariadb.EventStore) {
-	c, err := mariadb.Open(getTestDSN())
-	if err != nil {
-		panic(err)
-	}
-
+	c := getTestClient()
 	es, err := c.GetStore("test")
 	if err != nil {
 		c.Close()

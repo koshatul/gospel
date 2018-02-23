@@ -14,17 +14,19 @@ import (
 
 var _ = Describe("EventStore", func() {
 	var (
-		client *Client
-		store  *EventStore
 		ctx    context.Context
 		cancel func()
+
+		client *Client
+		store  *EventStore
 	)
 
 	BeforeEach(func() {
-		client, store = getTestStore()
 		var fn func()
-		ctx, fn = context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, fn = context.WithTimeout(context.Background(), 250*time.Millisecond)
 		cancel = fn // defeat go vet warning about unused cancel func
+
+		client, store = getTestStore()
 	})
 
 	AfterEach(func() {
