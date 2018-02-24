@@ -178,6 +178,10 @@ func (r *Reader) poll() error {
 }
 
 func (r *Reader) fetch() (*sql.Rows, error) {
+	// always select enough facts to fill the lookahead buffer, plus 1 to
+	// make the send to f.facts block until more facts are needed.
+	limit := cap(r.facts) - len(r.facts) + 1
+
 	return r.db.QueryContext(
 		r.ctx,
 		`SELECT
@@ -197,27 +201,6 @@ func (r *Reader) fetch() (*sql.Rows, error) {
 		r.store,
 		r.addr.Stream,
 		r.addr.Offset,
-		r.fetchLimit(),
+		limit,
 	)
-}
-
-// fetchLimit returns the number of facts to read in order to fill r.facts.
-func (r *Reader) fetchLimit() int {
-	size := cap(r.facts)
-
-	// If the channel is unbuffered always select 1 fact at a time.
-	if size == 0 {
-		return 1
-	}
-
-	// For a buffered channel, we want to get enough facts to fill it.
-	limit := size - len(r.facts)
-
-	// This should never happen, as fetch() is designed only to be called when
-	// a send to the buffer will not block.
-	if limit == 0 {
-		panic("fetch occurred before lookahead buffer has been consumed")
-	}
-
-	return limit
 }

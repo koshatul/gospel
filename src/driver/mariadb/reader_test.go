@@ -19,6 +19,8 @@ var _ = Describe("Reader", func() {
 
 		client *Client
 		store  *EventStore
+		reader streakdb.Reader
+		addr   streakdb.Address
 	)
 
 	BeforeEach(func() {
@@ -36,82 +38,117 @@ var _ = Describe("Reader", func() {
 			streakdb.Event{EventType: "event-3"},
 		)
 		Expect(err).ShouldNot(HaveOccurred())
+
+		addr = streakdb.Address{
+			Stream: "test-stream",
+			Offset: 0,
+		}
+	})
+
+	JustBeforeEach(func() {
+		var err error
+		reader, err = store.Open(addr)
+		if err != nil {
+			panic(err)
+		}
 	})
 
 	AfterEach(func() {
 		cancel()
+		reader.Close()
 		client.Close()
 		destroyTestSchema()
 	})
 
 	Describe("Next", func() {
 		It("returns the address of the next fact", func() {
-			addr := streakdb.Address{
-				Stream: "test-stream",
-				Offset: 0,
-			}
-
-			r, err := store.Open(addr)
-			Expect(err).ShouldNot(HaveOccurred())
-			defer r.Close()
-
-			nx, err := r.Next(ctx)
+			nx, err := reader.Next(ctx)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(nx).To(Equal(addr.Next()))
 		})
 
 		It("blocks until the deadline if there are no more facts to read", func() {
-			r, err := store.Open(
-				streakdb.Address{
-					Stream: "test-stream",
-					Offset: 3,
-				},
-			)
+			_, err := reader.Next(ctx)
 			Expect(err).ShouldNot(HaveOccurred())
-			defer r.Close()
+			_, err = reader.Next(ctx)
+			Expect(err).ShouldNot(HaveOccurred())
+			_, err = reader.Next(ctx)
+			Expect(err).ShouldNot(HaveOccurred())
 
-			_, err = r.Next(ctx)
+			_, err = reader.Next(ctx)
 			Expect(err).To(Equal(context.DeadlineExceeded))
 		})
 
 		It("returns an error if the reader is closed", func() {
-			r, err := store.Open(streakdb.Address{
-				Stream: "test-stream",
-				Offset: 0,
-			})
-			Expect(err).ShouldNot(HaveOccurred())
-			r.Close()
+			reader.Close()
 
-			_, err = r.Next(ctx)
+			_, err := reader.Next(ctx)
 			Expect(err).To(MatchError("reader is closed"))
 		})
 	})
 
 	Describe("Get", func() {
 		It("returns the current fact", func() {
-			addr := streakdb.Address{
-				Stream: "test-stream",
-				Offset: 0,
-			}
-
-			r, err := store.Open(addr)
-			Expect(err).ShouldNot(HaveOccurred())
-			defer r.Close()
-
-			_, err = r.Next(ctx)
+			_, err := reader.Next(ctx)
 			Expect(err).ShouldNot(HaveOccurred())
 
-			f := r.Get()
+			f := reader.Get()
 
 			Expect(f).To(Equal(streakdb.Fact{
 				Addr:  addr,
 				Event: streakdb.Event{EventType: "event-1"},
-				Time:  f.Time,
+				Time:  f.Time, // perform fuzzy check for time below
 			}))
 
 			// Use a loose comparison for time, as MariaDB is typically going
 			// to be running in a VM (ie, a separate clock) during testing.
-			Expect(f.Time).To(BeTemporally("~", time.Now(), 5*time.Second))
+			Expect(f.Time).To(
+				BeTemporally(
+					"~",
+					time.Now(),
+					1*time.Minute,
+				),
+			)
 		})
+
+		It("returns the expected facts", func() {
+			var types []string
+
+			for {
+				_, err := reader.Next(ctx)
+				Expect(err).ShouldNot(HaveOccurred())
+
+				types = append(
+					types,
+					reader.Get().Event.EventType,
+				)
+
+				if len(types) == 3 {
+					break
+				}
+			}
+
+			Expect(types).To(Equal([]string{
+				"event-1",
+				"event-2",
+				"event-3",
+			}))
+		})
+
+		It("returns the same fact until next is called", func() {
+			_, err := reader.Next(ctx)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			f1 := reader.Get()
+			f2 := reader.Get()
+			Expect(f2).To(Equal(f1))
+
+			_, err = reader.Next(ctx)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			f3 := reader.Get()
+			Expect(f3).NotTo(Equal(f1))
+		})
+
 	})
 })
