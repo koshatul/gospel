@@ -2,9 +2,22 @@ package driver_test
 
 import (
 	. "github.com/jmalloc/streakdb/src/driver"
+	"github.com/jmalloc/streakdb/src/streakdb"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
+
+var _ = Describe("NewReaderOptions", func() {
+	It("applies the provided options", func() {
+		opts := NewReaderOptions(
+			[]ReaderOption{
+				streakdb.FilterByEventType("foo"),
+			},
+		)
+
+		Expect(opts.FilterByEventType).To(BeTrue())
+	})
+})
 
 var _ = Describe("ReaderOptions", func() {
 	Describe("Get", func() {

@@ -3,8 +3,24 @@ package driver
 // ReaderOptions is a struct that contains the options applied by
 // streakdb.ReaderOption functions.
 type ReaderOptions struct {
-	EventTypes map[string]struct{} // nil == do not filter
-	extra      map[interface{}]interface{}
+	FilterByEventType bool
+	EventTypes        []string
+	extra             map[interface{}]interface{}
+}
+
+// ReaderOption is a function that applies a reader option to a ReaderOptions
+// struct.
+type ReaderOption func(o *ReaderOptions)
+
+// NewReaderOptions returns a new ReaderOptions struct with opts applied.
+func NewReaderOptions(opts []ReaderOption) *ReaderOptions {
+	o := &ReaderOptions{}
+
+	for _, fn := range opts {
+		fn(o)
+	}
+
+	return o
 }
 
 // Get returns the non-standard option associated with k.

@@ -8,15 +8,23 @@ import (
 )
 
 var _ = Describe("FilterByEventType", func() {
-	It("returns an option that sets the event types", func() {
+	It("enables the event type filter", func() {
+		opts := &driver.ReaderOptions{}
+
+		FilterByEventType("foo", "bar")(opts)
+
+		Expect(opts.FilterByEventType).To(BeTrue())
+	})
+
+	It("sets the event types", func() {
 		opts := &driver.ReaderOptions{}
 
 		FilterByEventType("foo", "bar")(opts)
 
 		Expect(opts.EventTypes).To(Equal(
-			map[string]struct{}{
-				"foo": {},
-				"bar": {},
+			[]string{
+				"foo",
+				"bar",
 			},
 		))
 	})
@@ -28,11 +36,11 @@ var _ = Describe("FilterByEventType", func() {
 		FilterByEventType("baz", "qux")(opts)
 
 		Expect(opts.EventTypes).To(Equal(
-			map[string]struct{}{
-				"foo": {},
-				"bar": {},
-				"baz": {},
-				"qux": {},
+			[]string{
+				"foo",
+				"bar",
+				"baz",
+				"qux",
 			},
 		))
 	})

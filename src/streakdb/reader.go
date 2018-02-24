@@ -33,7 +33,7 @@ type Reader interface {
 
 // ReaderOption is a function that applies a reader option to a ReaderOptions
 // struct.
-type ReaderOption func(o *driver.ReaderOptions)
+type ReaderOption = driver.ReaderOption
 
 // FilterByEventType is a reader option that limits the reader to facts with
 // events of a specific type.
@@ -42,12 +42,7 @@ type ReaderOption func(o *driver.ReaderOptions)
 // allowed types.
 func FilterByEventType(types ...string) ReaderOption {
 	return func(o *driver.ReaderOptions) {
-		if o.EventTypes == nil {
-			o.EventTypes = map[string]struct{}{}
-		}
-
-		for _, t := range types {
-			o.EventTypes[t] = struct{}{}
-		}
+		o.FilterByEventType = true
+		o.EventTypes = append(o.EventTypes, types...)
 	}
 }
