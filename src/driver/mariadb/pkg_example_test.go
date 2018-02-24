@@ -66,14 +66,17 @@ func Example_appendAndRead() {
 	// Note that there is no "end of the stream".
 	for {
 		_, err := r.Next(ctx)
-		if err == context.DeadlineExceeded {
-			return
-		} else if err != nil {
+		if err != nil {
 			panic(err)
 		}
 
 		fact := r.Get()
 		fmt.Println(fact.Event.EventType)
+
+		// Bail once we know we've reached the end of our test events.
+		if fact.Event.EventType == "event-3" {
+			return
+		}
 	}
 
 	// Output:

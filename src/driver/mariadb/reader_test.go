@@ -27,7 +27,7 @@ var _ = Describe("Reader", func() {
 
 	BeforeEach(func() {
 		var fn func()
-		ctx, fn = context.WithTimeout(context.Background(), 250*time.Millisecond)
+		ctx, fn = context.WithTimeout(context.Background(), 1*time.Second)
 		cancel = fn // defeat go vet warning about unused cancel func
 
 		client, store = getTestStore()
@@ -78,7 +78,10 @@ var _ = Describe("Reader", func() {
 			_, err = reader.Next(ctx)
 			Expect(err).ShouldNot(HaveOccurred())
 
-			_, err = reader.Next(ctx)
+			nextCtx, cancel := context.WithTimeout(ctx, 150*time.Millisecond)
+			defer cancel()
+
+			_, err = reader.Next(nextCtx)
 			Expect(err).To(Equal(context.DeadlineExceeded))
 		})
 
@@ -169,7 +172,11 @@ var _ = Describe("Reader", func() {
 			It("returns the address of the next unfiltered fact", func() {
 				nx, err := reader.Next(ctx)
 				Expect(err).ShouldNot(HaveOccurred())
-				Expect(nx).To(Equal(addr.Next().Next())) // second fact is filtered
+
+				Expect(nx).To(SatisfyAny(
+					Equal(addr.Next().Next()), // second fact is filtered out
+					Equal(addr.Next()),        // write to facts channel wasn't fast enough to provide the next event
+				))
 			})
 
 			It("skips over filtered facts", func() {

@@ -34,7 +34,7 @@ var _ = Describe("Client", func() {
 
 	BeforeEach(func() {
 		var fn func()
-		ctx, fn = context.WithTimeout(context.Background(), 250*time.Millisecond)
+		ctx, fn = context.WithTimeout(context.Background(), 1*time.Second)
 		cancel = fn // defeat go vet warning about unused cancel func
 
 		client = getTestClient()
