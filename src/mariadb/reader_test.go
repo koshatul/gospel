@@ -6,8 +6,8 @@ import (
 	"context"
 	"time"
 
-	. "github.com/jmalloc/gospel/src/driver/mariadb"
 	"github.com/jmalloc/gospel/src/gospel"
+	. "github.com/jmalloc/gospel/src/mariadb"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

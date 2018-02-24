@@ -3,7 +3,7 @@ package gospel
 import (
 	"context"
 
-	"github.com/jmalloc/gospel/src/driver"
+	"github.com/jmalloc/gospel/src/internal/driver"
 )
 
 // Reader is an interface for reading facts from a stream in order.

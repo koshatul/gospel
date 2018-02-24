@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/jmalloc/gospel/src/driver"
 	"github.com/jmalloc/gospel/src/gospel"
+	"github.com/jmalloc/gospel/src/internal/driver"
 )
 
 // EventStore an interface for reading and writing streams of events stored in

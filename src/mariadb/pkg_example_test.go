@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jmalloc/gospel/src/driver/mariadb"
 	"github.com/jmalloc/gospel/src/gospel"
+	"github.com/jmalloc/gospel/src/mariadb"
 )
 
 // This example illustrates how to append and read events to/from an event store.

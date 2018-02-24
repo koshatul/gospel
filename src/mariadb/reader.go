@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jmalloc/gospel/src/driver"
 	"github.com/jmalloc/gospel/src/gospel"
+	"github.com/jmalloc/gospel/src/internal/driver"
 	"golang.org/x/time/rate"
 )
 

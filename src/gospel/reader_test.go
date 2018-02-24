@@ -1,8 +1,8 @@
 package gospel_test
 
 import (
-	"github.com/jmalloc/gospel/src/driver"
 	. "github.com/jmalloc/gospel/src/gospel"
+	"github.com/jmalloc/gospel/src/internal/driver"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

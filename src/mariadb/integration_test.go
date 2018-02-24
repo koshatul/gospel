@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/go-sql-driver/mysql"
-	"github.com/jmalloc/gospel/src/driver/mariadb"
+	"github.com/jmalloc/gospel/src/mariadb"
 )
 
 // getTestClient returns a Client that uses the test DSN.
