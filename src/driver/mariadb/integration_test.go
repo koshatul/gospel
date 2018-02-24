@@ -51,6 +51,7 @@ func destroyTestSchema() {
 	if err != nil {
 		panic(err)
 	}
+	defer db.Close()
 
 	_, err = db.Exec(`DROP SCHEMA ` + cfg.DBName)
 	if err != nil {
