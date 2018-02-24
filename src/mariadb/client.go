@@ -60,6 +60,13 @@ func Open(dsn string, opts ...gospel.Option) (*Client, error) {
 		)
 	}
 
+	o.Logger.Log(
+		"connected to MariaDB event store at %s@%s/%s",
+		cfg.User,
+		cfg.Addr,
+		cfg.DBName,
+	)
+
 	return &Client{
 		db,
 		o.Logger,
@@ -70,19 +77,19 @@ func Open(dsn string, opts ...gospel.Option) (*Client, error) {
 // the GOSPEL_MARIADB_DSN environment variable.
 //
 // If the environment variable is not set,
-func OpenEnv() (*Client, error) {
+func OpenEnv(opts ...gospel.Option) (*Client, error) {
 	dsn := os.Getenv("GOSPEL_MARIADB_DSN")
 	if dsn == "" {
 		return nil, errors.New("the GOSPEL_MARIADB_DSN environment variable is not set")
 	}
 
-	return Open(dsn)
+	return Open(dsn, opts...)
 }
 
 // OpenStore returns an event store by name.
 //
 // ctx applies to the opening of the store, and not to the store itself.
-func (c *Client) OpenStore(ctx context.Context, name string) (es *EventStore, err error) {
+func (c *Client) OpenStore(ctx context.Context, name string) (*EventStore, error) {
 	var id int64
 
 	res, err := c.db.ExecContext(ctx, `INSERT INTO store SET name = ?`, name)
@@ -90,23 +97,28 @@ func (c *Client) OpenStore(ctx context.Context, name string) (es *EventStore, er
 	if isDuplicateEntry(err) {
 		row := c.db.QueryRowContext(ctx, `SELECT id FROM store WHERE name = ?`, name)
 		err = row.Scan(&id)
-	} else if err == nil {
-		c.logger.Log(
-			"created new event store named '%s'",
-			name,
-		)
+		if err != nil {
+			return nil, err
+		}
 
+		c.logger.Log("opened existing event store '%s'", name)
+	} else if err == nil {
 		id, err = res.LastInsertId()
+		if err != nil {
+			return nil, err
+		}
+
+		c.logger.Log("created new event store '%s'", name)
+	} else {
+		return nil, err
 	}
 
-	es = &EventStore{
+	return &EventStore{
 		c.db,
 		uint64(id),
 		name,
 		c.logger,
-	}
-
-	return
+	}, nil
 }
 
 // Close closes the database connection.

@@ -8,10 +8,17 @@ import (
 
 	"github.com/jmalloc/gospel/src/gospel"
 	"github.com/jmalloc/gospel/src/mariadb"
+	"github.com/jmalloc/twelf/src/twelf"
 )
 
 func main() {
-	c, err := mariadb.OpenEnv()
+	c, err := mariadb.OpenEnv(
+		gospel.Logger(
+			&twelf.StandardLogger{
+				CaptureDebug: true,
+			},
+		),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
