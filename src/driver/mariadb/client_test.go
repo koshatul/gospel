@@ -6,8 +6,8 @@ import (
 	"context"
 	"time"
 
-	. "github.com/jmalloc/streakdb/src/driver/mariadb"
-	"github.com/jmalloc/streakdb/src/streakdb"
+	. "github.com/jmalloc/gospel/src/driver/mariadb"
+	"github.com/jmalloc/gospel/src/gospel"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -47,8 +47,8 @@ var _ = Describe("Client", func() {
 	})
 
 	Describe("OpenStore", func() {
-		It("returns a streakdb.EventStore", func() {
-			var es streakdb.EventStore // static interface check
+		It("returns a gospel.EventStore", func() {
+			var es gospel.EventStore // static interface check
 			es, err := client.OpenStore(ctx, "test")
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(es).NotTo(BeNil())

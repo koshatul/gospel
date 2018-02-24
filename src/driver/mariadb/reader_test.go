@@ -6,8 +6,8 @@ import (
 	"context"
 	"time"
 
-	. "github.com/jmalloc/streakdb/src/driver/mariadb"
-	"github.com/jmalloc/streakdb/src/streakdb"
+	. "github.com/jmalloc/gospel/src/driver/mariadb"
+	"github.com/jmalloc/gospel/src/gospel"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -19,10 +19,10 @@ var _ = Describe("Reader", func() {
 
 		client *Client
 		store  *EventStore
-		reader streakdb.Reader
+		reader gospel.Reader
 
-		addr streakdb.Address
-		opts []streakdb.ReaderOption
+		addr gospel.Address
+		opts []gospel.ReaderOption
 	)
 
 	BeforeEach(func() {
@@ -35,13 +35,13 @@ var _ = Describe("Reader", func() {
 		_, err := store.AppendUnchecked(
 			ctx,
 			"test-stream",
-			streakdb.Event{EventType: "event-type-1", Body: []byte("event-1")},
-			streakdb.Event{EventType: "event-type-2", Body: []byte("event-2")},
-			streakdb.Event{EventType: "event-type-3", Body: []byte("event-3")},
+			gospel.Event{EventType: "event-type-1", Body: []byte("event-1")},
+			gospel.Event{EventType: "event-type-2", Body: []byte("event-2")},
+			gospel.Event{EventType: "event-type-3", Body: []byte("event-3")},
 		)
 		Expect(err).ShouldNot(HaveOccurred())
 
-		addr = streakdb.Address{
+		addr = gospel.Address{
 			Stream: "test-stream",
 			Offset: 0,
 		}
@@ -97,9 +97,9 @@ var _ = Describe("Reader", func() {
 
 			f := reader.Get()
 
-			Expect(f).To(Equal(streakdb.Fact{
+			Expect(f).To(Equal(gospel.Fact{
 				Addr: addr,
-				Event: streakdb.Event{
+				Event: gospel.Event{
 					EventType: "event-type-1",
 					Body:      []byte("event-1"),
 				},
@@ -159,7 +159,7 @@ var _ = Describe("Reader", func() {
 
 	Context("when using an event-type filter", func() {
 		BeforeEach(func() {
-			opts = append(opts, streakdb.FilterByEventType(
+			opts = append(opts, gospel.FilterByEventType(
 				"event-type-1",
 				"event-type-3",
 			))

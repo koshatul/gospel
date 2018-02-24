@@ -1,7 +1,7 @@
 package driver
 
 // ReaderOptions is a struct that contains the options applied by
-// streakdb.ReaderOption functions.
+// gospel.ReaderOption functions.
 type ReaderOptions struct {
 	FilterByEventType bool
 	EventTypes        []string

@@ -1,4 +1,4 @@
-package streakdb
+package gospel
 
 // Event is an application-defined event.
 //

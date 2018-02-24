@@ -1,4 +1,4 @@
-package streakdb_test
+package gospel_test
 
 import (
 	"reflect"

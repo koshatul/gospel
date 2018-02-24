@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/jmalloc/streakdb/src/driver"
-	"github.com/jmalloc/streakdb/src/streakdb"
+	"github.com/jmalloc/gospel/src/driver"
+	"github.com/jmalloc/gospel/src/gospel"
 )
 
 // EventStore an interface for reading and writing streams of events stored in
@@ -31,9 +31,9 @@ type EventStore struct {
 // Append panics if ev is empty.
 func (es *EventStore) Append(
 	ctx context.Context,
-	addr streakdb.Address,
-	ev ...streakdb.Event,
-) (streakdb.Address, error) {
+	addr gospel.Address,
+	ev ...gospel.Event,
+) (gospel.Address, error) {
 	err := es.append(ctx, &addr, ev, appendChecked)
 	return addr, err
 }
@@ -51,9 +51,9 @@ func (es *EventStore) Append(
 func (es *EventStore) AppendUnchecked(
 	ctx context.Context,
 	stream string,
-	ev ...streakdb.Event,
-) (streakdb.Address, error) {
-	addr := streakdb.Address{Stream: stream}
+	ev ...gospel.Event,
+) (gospel.Address, error) {
+	addr := gospel.Address{Stream: stream}
 	err := es.append(ctx, &addr, ev, appendUnchecked)
 	return addr, err
 }
@@ -63,9 +63,9 @@ func (es *EventStore) AppendUnchecked(
 // ctx applies to the opening of the reader, and not to the reader itself.
 func (es *EventStore) Open(
 	ctx context.Context,
-	addr streakdb.Address,
-	opts ...streakdb.ReaderOption,
-) (streakdb.Reader, error) {
+	addr gospel.Address,
+	opts ...gospel.ReaderOption,
+) (gospel.Reader, error) {
 	return openReader(
 		ctx,
 		es.db,
@@ -82,8 +82,8 @@ func (es *EventStore) Open(
 // the context deadline.
 func (es *EventStore) append(
 	ctx context.Context,
-	addr *streakdb.Address,
-	events []streakdb.Event,
+	addr *gospel.Address,
+	events []gospel.Event,
 	strategy appendStrategy,
 ) error {
 	if addr.Stream == "" {

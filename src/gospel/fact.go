@@ -1,4 +1,4 @@
-package streakdb
+package gospel
 
 import "time"
 

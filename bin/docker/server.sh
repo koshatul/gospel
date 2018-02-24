@@ -1,18 +1,18 @@
 docker network create \
-    streakdb \
+    gospel \
     --driver overlay \
     --attachable
 
-docker volume create streakdb
+docker volume create gospel
 
 docker service create \
-    --name streakdb-mariadb \
+    --name gospel-mariadb \
     --env MYSQL_ROOT_PASSWORD=root \
-    --env MYSQL_USER=streakdb \
-    --env MYSQL_PASSWORD=streakdb \
-    --env MYSQL_DATABASE=streakdb \
+    --env MYSQL_USER=gospel \
+    --env MYSQL_PASSWORD=gospel \
+    --env MYSQL_DATABASE=gospel \
     --publish 3306:3306 \
-    --network streakdb \
-    --mount type=volume,source=streakdb,target=/var/lib/mysql \
+    --network gospel \
+    --mount type=volume,source=gospel,target=/var/lib/mysql \
     --detach \
     mariadb:10

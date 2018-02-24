@@ -1,8 +1,8 @@
-package streakdb_test
+package gospel_test
 
 import (
-	"github.com/jmalloc/streakdb/src/driver"
-	. "github.com/jmalloc/streakdb/src/streakdb"
+	"github.com/jmalloc/gospel/src/driver"
+	. "github.com/jmalloc/gospel/src/gospel"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

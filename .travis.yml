@@ -5,7 +5,7 @@ services:
 addons:
   mariadb: '10.2'
 env:
-- STREAKDB_MARIADB_TEST_DSN="travis@tcp(127.0.0.1:3306)/streakdb"
-before_install: mysql -e 'CREATE DATABASE streakdb;'
+- GOSPEL_MARIADB_TEST_DSN="travis@tcp(127.0.0.1:3306)/gospel"
+before_install: mysql -e 'CREATE DATABASE gospel;'
 script: make ci
 after_script: bash <(curl -s https://codecov.io/bash)

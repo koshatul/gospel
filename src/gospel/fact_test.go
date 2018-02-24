@@ -1,9 +1,9 @@
-package streakdb_test
+package gospel_test
 
 import (
 	"time"
 
-	. "github.com/jmalloc/streakdb/src/streakdb"
+	. "github.com/jmalloc/gospel/src/gospel"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

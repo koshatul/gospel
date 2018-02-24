@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jmalloc/streakdb/src/driver"
-	"github.com/jmalloc/streakdb/src/streakdb"
+	"github.com/jmalloc/gospel/src/driver"
+	"github.com/jmalloc/gospel/src/gospel"
 	"golang.org/x/time/rate"
 )
 
@@ -18,12 +18,12 @@ type Reader struct {
 	stmt  *sql.Stmt
 	limit *rate.Limiter
 
-	current *streakdb.Fact
-	next    *streakdb.Fact
-	facts   chan streakdb.Fact
+	current *gospel.Fact
+	next    *gospel.Fact
+	facts   chan gospel.Fact
 	done    chan error
 
-	addr   streakdb.Address
+	addr   gospel.Address
 	ctx    context.Context
 	cancel func()
 }
@@ -35,7 +35,7 @@ func openReader(
 	ctx context.Context,
 	db *sql.DB,
 	storeID uint64,
-	addr streakdb.Address,
+	addr gospel.Address,
 	opts *driver.ReaderOptions,
 ) (*Reader, error) {
 	stmt, err := prepareReaderStatement(ctx, db, opts, storeID, addr.Stream)
@@ -51,7 +51,7 @@ func openReader(
 		stmt:  stmt,
 		limit: rate.NewLimiter(rate.Inf, 1), // TODO
 
-		facts: make(chan streakdb.Fact, 10), // TODO
+		facts: make(chan gospel.Fact, 10), // TODO
 		done:  make(chan error, 1),
 
 		addr:   addr,
@@ -75,7 +75,7 @@ func openReader(
 // Note that addr is not always the address immediately following the fact
 // returned by Get() - it may be "further ahead" in the stream, skipping
 // over any facts that the reader is not interested in.
-func (r *Reader) Next(ctx context.Context) (addr streakdb.Address, err error) {
+func (r *Reader) Next(ctx context.Context) (addr gospel.Address, err error) {
 	if r.next == nil {
 		select {
 		case f := <-r.facts:
@@ -110,7 +110,7 @@ func (r *Reader) Next(ctx context.Context) (addr streakdb.Address, err error) {
 //
 // It panics if Next() has not been called.
 // Get() returns the same Fact until Next() is called again.
-func (r *Reader) Get() streakdb.Fact {
+func (r *Reader) Get() gospel.Fact {
 	if r.current == nil {
 		panic("Next() must be called before calling Get()")
 	}
@@ -169,7 +169,7 @@ func (r *Reader) poll() error {
 	}
 	defer rows.Close()
 
-	f := streakdb.Fact{
+	f := gospel.Fact{
 		Addr: r.addr,
 	}
 

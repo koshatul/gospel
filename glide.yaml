@@ -1,4 +1,4 @@
-package: github.com/jmalloc/streakdb
+package: github.com/jmalloc/gospel
 import:
 - package: github.com/go-sql-driver/mysql
   version: master

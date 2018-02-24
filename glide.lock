@@ -1,5 +1,5 @@
-hash: 97207fe6608af0a98c77e5e7019c3309c81d33fed6e12e8aa5bb74362fd87028
-updated: 2018-02-22T18:24:04.519359+10:00
+hash: 4cedfd5e72240ffd2b7e91195cf2eb75cd457c85f0310776b45431e80403197a
+updated: 2018-02-24T15:08:33.55717+10:00
 imports:
 - name: github.com/go-sql-driver/mysql
   version: bc14601d1bd56421dd60f561e6052c9ed77f9daf
@@ -7,6 +7,13 @@ imports:
   version: 3c4937480c32f4c13a875a1829af76c98ca3d40a
 - name: go.uber.org/atomic
   version: 8474b86a5a6f79c443ce4b2992817ff32cf208b8
+- name: golang.org/x/net
+  version: f5dfe339be1d06f81b22525fe34671ee7d2c8904
+  subpackages:
+  - context
+  - html
+  - html/atom
+  - html/charset
 - name: golang.org/x/time
   version: 6dc17368e09b0e8634d71cac8168d853e869a0c7
   subpackages:
@@ -50,12 +57,6 @@ testImports:
   - matchers/support/goraph/node
   - matchers/support/goraph/util
   - types
-- name: golang.org/x/net
-  version: f5dfe339be1d06f81b22525fe34671ee7d2c8904
-  subpackages:
-  - html
-  - html/atom
-  - html/charset
 - name: golang.org/x/sys
   version: 37707fdb30a5b38865cfb95e5aab41707daec7fd
   subpackages:

@@ -1,9 +1,9 @@
-package streakdb
+package gospel
 
 import (
 	"context"
 
-	"github.com/jmalloc/streakdb/src/driver"
+	"github.com/jmalloc/gospel/src/driver"
 )
 
 // Reader is an interface for reading facts from a stream in order.

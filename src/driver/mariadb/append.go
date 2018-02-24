@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/jmalloc/streakdb/src/streakdb"
+	"github.com/jmalloc/gospel/src/gospel"
 )
 
 // atomicAppend writes events to a stream inside a transaction using the given
@@ -13,8 +13,8 @@ func atomicAppend(
 	ctx context.Context,
 	db *sql.DB,
 	storeID uint64,
-	addr *streakdb.Address,
-	events []streakdb.Event,
+	addr *gospel.Address,
+	events []gospel.Event,
 	strategy appendStrategy,
 ) error {
 	tx, err := db.Begin()
@@ -38,8 +38,8 @@ type appendStrategy func(
 	ctx context.Context,
 	tx *sql.Tx,
 	storeID uint64,
-	addr *streakdb.Address,
-	events []streakdb.Event,
+	addr *gospel.Address,
+	events []gospel.Event,
 ) error
 
 // appendChecked is an append strategy which verifies that addr refers to the
@@ -48,8 +48,8 @@ func appendChecked(
 	ctx context.Context,
 	tx *sql.Tx,
 	storeID uint64,
-	addr *streakdb.Address,
-	events []streakdb.Event,
+	addr *gospel.Address,
+	events []gospel.Event,
 ) error {
 	for _, ev := range events {
 		row := tx.QueryRowContext(
@@ -69,7 +69,7 @@ func appendChecked(
 		}
 
 		if !ok {
-			return streakdb.ConflictError{Addr: *addr}
+			return gospel.ConflictError{Addr: *addr}
 		}
 
 		addr.Offset++
@@ -84,8 +84,8 @@ func appendUnchecked(
 	ctx context.Context,
 	tx *sql.Tx,
 	storeID uint64,
-	addr *streakdb.Address,
-	events []streakdb.Event,
+	addr *gospel.Address,
+	events []gospel.Event,
 ) error {
 	for _, ev := range events {
 		row := tx.QueryRowContext(

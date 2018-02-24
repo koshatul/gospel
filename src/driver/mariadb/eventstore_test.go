@@ -6,8 +6,8 @@ import (
 	"context"
 	"time"
 
-	. "github.com/jmalloc/streakdb/src/driver/mariadb"
-	"github.com/jmalloc/streakdb/src/streakdb"
+	. "github.com/jmalloc/gospel/src/driver/mariadb"
+	"github.com/jmalloc/gospel/src/gospel"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -37,7 +37,7 @@ var _ = Describe("EventStore", func() {
 
 	Describe("Append", func() {
 		Context("when the stream is empty", func() {
-			next := streakdb.Address{
+			next := gospel.Address{
 				Stream: "test-stream",
 				Offset: 0,
 			}
@@ -46,7 +46,7 @@ var _ = Describe("EventStore", func() {
 				nx, err := store.Append(
 					ctx,
 					next,
-					streakdb.Event{},
+					gospel.Event{},
 				)
 
 				Expect(err).ShouldNot(HaveOccurred())
@@ -59,8 +59,8 @@ var _ = Describe("EventStore", func() {
 				nx, err := store.Append(
 					ctx,
 					next,
-					streakdb.Event{},
-					streakdb.Event{},
+					gospel.Event{},
+					gospel.Event{},
 				)
 
 				Expect(err).ShouldNot(HaveOccurred())
@@ -73,26 +73,26 @@ var _ = Describe("EventStore", func() {
 				_, err := store.Append(
 					ctx,
 					next.Next(),
-					streakdb.Event{},
+					gospel.Event{},
 				)
 
 				Expect(err).Should(HaveOccurred())
-				Expect(streakdb.IsConflict(err)).To(BeTrue())
+				Expect(gospel.IsConflict(err)).To(BeTrue())
 			})
 		})
 
 		Context("when the stream is not empty", func() {
-			var next streakdb.Address
+			var next gospel.Address
 
 			BeforeEach(func() {
 				nx, err := store.Append(
 					ctx,
-					streakdb.Address{
+					gospel.Address{
 						Stream: "test-stream",
 						Offset: 0,
 					},
-					streakdb.Event{},
-					streakdb.Event{},
+					gospel.Event{},
+					gospel.Event{},
 				)
 				Expect(err).ShouldNot(HaveOccurred())
 				next = nx
@@ -102,7 +102,7 @@ var _ = Describe("EventStore", func() {
 				nx, err := store.Append(
 					ctx,
 					next,
-					streakdb.Event{},
+					gospel.Event{},
 				)
 
 				Expect(err).ShouldNot(HaveOccurred())
@@ -115,8 +115,8 @@ var _ = Describe("EventStore", func() {
 				nx, err := store.Append(
 					ctx,
 					next,
-					streakdb.Event{},
-					streakdb.Event{},
+					gospel.Event{},
+					gospel.Event{},
 				)
 
 				Expect(err).ShouldNot(HaveOccurred())
@@ -129,15 +129,15 @@ var _ = Describe("EventStore", func() {
 				_, err := store.Append(
 					ctx,
 					next.Next(),
-					streakdb.Event{},
+					gospel.Event{},
 				)
 
 				Expect(err).Should(HaveOccurred())
-				Expect(streakdb.IsConflict(err)).To(BeTrue())
+				Expect(gospel.IsConflict(err)).To(BeTrue())
 			})
 
 			It("returns a conflict error when the offset is too low", func() {
-				addr := streakdb.Address{
+				addr := gospel.Address{
 					Stream: "test-stream",
 					Offset: 0,
 				}
@@ -145,11 +145,11 @@ var _ = Describe("EventStore", func() {
 				_, err := store.Append(
 					ctx,
 					addr,
-					streakdb.Event{},
+					gospel.Event{},
 				)
 
 				Expect(err).Should(HaveOccurred())
-				Expect(streakdb.IsConflict(err)).To(BeTrue())
+				Expect(gospel.IsConflict(err)).To(BeTrue())
 			})
 		})
 
@@ -157,7 +157,7 @@ var _ = Describe("EventStore", func() {
 			Expect(func() {
 				store.Append(
 					ctx,
-					streakdb.Address{Stream: "test-stream"},
+					gospel.Address{Stream: "test-stream"},
 				)
 			}).To(Panic())
 		})
@@ -166,8 +166,8 @@ var _ = Describe("EventStore", func() {
 			Expect(func() {
 				store.Append(
 					ctx,
-					streakdb.Address{Stream: ""},
-					streakdb.Event{},
+					gospel.Address{Stream: ""},
+					gospel.Event{},
 				)
 			}).To(Panic())
 		})
@@ -176,33 +176,33 @@ var _ = Describe("EventStore", func() {
 			// append event at +0
 			_, err := store.Append(
 				ctx,
-				streakdb.Address{
+				gospel.Address{
 					Stream: "test-stream",
 					Offset: 0,
 				},
-				streakdb.Event{},
+				gospel.Event{},
 			)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			// append a second event at +0, expected to conflict
 			_, err = store.Append(
 				ctx,
-				streakdb.Address{
+				gospel.Address{
 					Stream: "test-stream",
 					Offset: 0,
 				},
-				streakdb.Event{},
+				gospel.Event{},
 			)
-			Expect(streakdb.IsConflict(err)).To(BeTrue())
+			Expect(gospel.IsConflict(err)).To(BeTrue())
 
 			// append a second event at +1, expected to still be unused
 			_, err = store.Append(
 				ctx,
-				streakdb.Address{
+				gospel.Address{
 					Stream: "test-stream",
 					Offset: 1,
 				},
-				streakdb.Event{},
+				gospel.Event{},
 			)
 			Expect(err).ShouldNot(HaveOccurred())
 		})
@@ -210,7 +210,7 @@ var _ = Describe("EventStore", func() {
 
 	Describe("AppendUnchecked", func() {
 		Context("when the stream is empty", func() {
-			next := streakdb.Address{
+			next := gospel.Address{
 				Stream: "test-stream",
 				Offset: 0,
 			}
@@ -219,7 +219,7 @@ var _ = Describe("EventStore", func() {
 				nx, err := store.AppendUnchecked(
 					ctx,
 					"test-stream",
-					streakdb.Event{},
+					gospel.Event{},
 				)
 
 				Expect(err).ShouldNot(HaveOccurred())
@@ -232,8 +232,8 @@ var _ = Describe("EventStore", func() {
 				nx, err := store.AppendUnchecked(
 					ctx,
 					"test-stream",
-					streakdb.Event{},
-					streakdb.Event{},
+					gospel.Event{},
+					gospel.Event{},
 				)
 
 				Expect(err).ShouldNot(HaveOccurred())
@@ -244,17 +244,17 @@ var _ = Describe("EventStore", func() {
 		})
 
 		Context("when the stream is not empty", func() {
-			var next streakdb.Address
+			var next gospel.Address
 
 			BeforeEach(func() {
 				nx, err := store.Append(
 					ctx,
-					streakdb.Address{
+					gospel.Address{
 						Stream: "test-stream",
 						Offset: 0,
 					},
-					streakdb.Event{},
-					streakdb.Event{},
+					gospel.Event{},
+					gospel.Event{},
 				)
 				Expect(err).ShouldNot(HaveOccurred())
 				next = nx
@@ -264,7 +264,7 @@ var _ = Describe("EventStore", func() {
 				nx, err := store.AppendUnchecked(
 					ctx,
 					"test-stream",
-					streakdb.Event{},
+					gospel.Event{},
 				)
 
 				Expect(err).ShouldNot(HaveOccurred())
@@ -277,8 +277,8 @@ var _ = Describe("EventStore", func() {
 				nx, err := store.AppendUnchecked(
 					ctx,
 					"test-stream",
-					streakdb.Event{},
-					streakdb.Event{},
+					gospel.Event{},
+					gospel.Event{},
 				)
 
 				Expect(err).ShouldNot(HaveOccurred())
@@ -302,7 +302,7 @@ var _ = Describe("EventStore", func() {
 				store.AppendUnchecked(
 					ctx,
 					"",
-					streakdb.Event{},
+					gospel.Event{},
 				)
 			}).To(Panic())
 		})

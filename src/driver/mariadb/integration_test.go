@@ -9,17 +9,17 @@ import (
 	"time"
 
 	"github.com/go-sql-driver/mysql"
-	"github.com/jmalloc/streakdb/src/driver/mariadb"
+	"github.com/jmalloc/gospel/src/driver/mariadb"
 )
 
 // getTestDSN returns the MariaDB DSN used for integration tests.
 func getTestDSN() string {
-	dsn := os.Getenv("STREAKDB_MARIADB_TEST_DSN")
+	dsn := os.Getenv("GOSPEL_MARIADB_TEST_DSN")
 	if dsn != "" {
 		return dsn
 	}
 
-	return "streakdb:streakdb@tcp(127.0.0.1:3306)/streakdb"
+	return "gospel:gospel@tcp(127.0.0.1:3306)/gospel"
 }
 
 // getTestClient returns a Client that uses the test DSN.

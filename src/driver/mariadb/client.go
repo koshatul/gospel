@@ -5,7 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/go-sql-driver/mysql"
-	schema "github.com/jmalloc/streakdb/artifacts/mariadb"
+	schema "github.com/jmalloc/gospel/artifacts/mariadb"
 	"github.com/uber-go/multierr"
 )
 
