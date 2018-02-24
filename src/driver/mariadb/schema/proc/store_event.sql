@@ -5,9 +5,9 @@
 --
 CREATE FUNCTION IF NOT EXISTS store_event
 (
-    p_store        VARCHAR(255),
-    p_event_type   VARCHAR(255),
-    p_content_type VARCHAR(255),
+    p_store        VARBINARY(255),
+    p_event_type   VARBINARY(255),
+    p_content_type VARBINARY(255),
     p_body         LONGBLOB
 )
 RETURNS BIGINT UNSIGNED

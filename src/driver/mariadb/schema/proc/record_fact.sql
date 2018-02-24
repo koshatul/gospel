@@ -6,8 +6,8 @@
 --
 CREATE FUNCTION IF NOT EXISTS record_fact
 (
-    p_store    VARCHAR(255),
-    p_stream   VARCHAR(255),
+    p_store    VARBINARY(255),
+    p_stream   VARBINARY(255),
     p_event_id BIGINT UNSIGNED
 )
 RETURNS BIGINT UNSIGNED

@@ -24,6 +24,11 @@ func Open(dsn string) (*Client, error) {
 		return nil, err
 	}
 
+	if cfg.Params == nil {
+		cfg.Params = map[string]string{}
+	}
+
+	cfg.Collation = "binary"
 	cfg.MultiStatements = true   // required to init schema in single query
 	cfg.ParseTime = true         // allow row.Scan into time.Time
 	cfg.InterpolateParams = true // inject query values client-side (reduces roundtrips, no prepared statements)

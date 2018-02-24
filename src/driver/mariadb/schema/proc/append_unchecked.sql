@@ -3,10 +3,10 @@
 --
 CREATE FUNCTION IF NOT EXISTS append_unchecked
 (
-    p_store        VARCHAR(255),
-    p_stream       VARCHAR(255),
-    p_event_type   VARCHAR(255),
-    p_content_type VARCHAR(255),
+    p_store        VARBINARY(255),
+    p_stream       VARBINARY(255),
+    p_event_type   VARBINARY(255),
+    p_content_type VARBINARY(255),
     p_body         LONGBLOB
 )
 RETURNS BIGINT UNSIGNED

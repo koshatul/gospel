@@ -5,8 +5,8 @@
 -- originally appended to, as well as the ε-stream.
 --
 CREATE TABLE IF NOT EXISTS fact(
-    store    VARCHAR(255) NOT NULL,
-    stream   VARCHAR(255) NOT NULL,
+    store    VARBINARY(255) NOT NULL,
+    stream   VARBINARY(255) NOT NULL,
     offset   BIGINT UNSIGNED NOT NULL,
     event_id BIGINT UNSIGNED NOT NULL,
     time     TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),

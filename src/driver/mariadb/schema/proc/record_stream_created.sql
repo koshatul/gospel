@@ -6,8 +6,8 @@
 --
 CREATE PROCEDURE IF NOT EXISTS record_stream_created
 (
-    p_store  VARCHAR(255),
-    p_stream VARCHAR(255)
+    p_store  VARBINARY(255),
+    p_stream VARBINARY(255)
 )
 NOT DETERMINISTIC
 MODIFIES SQL DATA
