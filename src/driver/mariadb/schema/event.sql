@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS event
    body         LONGBLOB,
    time         TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
 
-   INDEX (store_id),
-   INDEX (event_type)
+   INDEX event_type (event_type),
+   INDEX archive (time, store_id)
 )
 ROW_FORMAT=COMPRESSED;

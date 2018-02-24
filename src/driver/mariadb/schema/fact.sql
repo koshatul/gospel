@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS fact
     event_id BIGINT UNSIGNED NOT NULL,
     time     TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
 
-    PRIMARY KEY (store_id, stream, offset)
+    PRIMARY KEY (store_id, stream, offset),
+    INDEX archive (time, store_id)
 )
 ROW_FORMAT=COMPRESSED;
