@@ -61,7 +61,7 @@ func Open(dsn string) (*Client, error) {
 func OpenEnv() (*Client, error) {
 	dsn := os.Getenv("GOSPEL_MARIADB_DSN")
 	if dsn == "" {
-		return nil, errors.New("GOSPEL_MARIADB_DSN is not set.")
+		return nil, errors.New("the GOSPEL_MARIADB_DSN environment variable is not set")
 	}
 
 	return Open(dsn)
