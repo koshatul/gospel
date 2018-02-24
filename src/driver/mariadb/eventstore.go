@@ -15,8 +15,8 @@ type EventStore struct {
 	// readers it creates.
 	db *sql.DB
 
-	// name is the name of the store.
-	name string
+	// id is the auto-increment ID of the store.
+	id uint64
 }
 
 // Append atomically writes one or more events to the end of a stream,
@@ -69,7 +69,7 @@ func (es *EventStore) Open(
 	return openReader(
 		ctx,
 		es.db,
-		es.name,
+		es.id,
 		addr,
 		driver.NewReaderOptions(opts),
 	)
@@ -100,7 +100,7 @@ func (es *EventStore) append(
 		err := atomicAppend(
 			ctx,
 			es.db,
-			es.name,
+			es.id,
 			addr,
 			events,
 			strategy,

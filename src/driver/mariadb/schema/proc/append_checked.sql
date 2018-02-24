@@ -6,7 +6,7 @@
 --
 CREATE FUNCTION IF NOT EXISTS append_checked
 (
-    p_store        VARBINARY(255),
+    p_store_id     BIGINT UNSIGNED,
     p_stream       VARBINARY(255),
     p_offset       BIGINT UNSIGNED,
     p_event_type   VARBINARY(255),
@@ -27,14 +27,13 @@ BEGIN
     END IF;
 
     SET v_event_id = store_event(
-        p_store,
         p_event_type,
         p_content_type,
         p_body
     );
 
     SET v_offset = record_fact(
-        p_store,
+        p_store_id,
         p_stream,
         v_event_id
     );
@@ -44,11 +43,11 @@ BEGIN
     END IF;
 
     IF v_offset = 0 THEN
-        CALL record_stream_created(p_store, p_stream);
+        CALL record_stream_created(p_store_id, p_stream);
     END IF;
 
     SELECT record_fact(
-        p_store,
+        p_store_id,
         "",
         v_event_id
     ) INTO @_;

@@ -1,9 +1,8 @@
 --
--- event stores application-defined event data.
+-- event contains application-defined event data.
 --
 CREATE TABLE IF NOT EXISTS event(
    id           BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-   store        VARBINARY(255) NOT NULL,
    event_type   VARBINARY(255) NOT NULL,
    content_type VARBINARY(255) NOT NULL,
    body         LONGBLOB,

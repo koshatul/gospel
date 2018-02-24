@@ -34,11 +34,11 @@ var errReaderClosed = errors.New("reader is closed")
 func openReader(
 	ctx context.Context,
 	db *sql.DB,
-	store string,
+	storeID uint64,
 	addr streakdb.Address,
 	opts *driver.ReaderOptions,
 ) (*Reader, error) {
-	stmt, err := prepareReaderStatement(ctx, db, opts, store, addr.Stream)
+	stmt, err := prepareReaderStatement(ctx, db, opts, storeID, addr.Stream)
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +199,7 @@ func prepareReaderStatement(
 	ctx context.Context,
 	db *sql.DB,
 	opts *driver.ReaderOptions,
-	store string,
+	storeID uint64,
 	stream string,
 ) (*sql.Stmt, error) {
 	filter := ""
@@ -219,19 +219,15 @@ func prepareReaderStatement(
 		INNER JOIN event AS e
 		ON e.id = f.event_id
 		%s
-		WHERE f.store = %s
+		WHERE f.store_id = %d
 			AND f.stream = %s
 			AND f.offset >= ?
 		ORDER BY offset
 		LIMIT ?`,
 		filter,
-		escapeString(store),
+		storeID,
 		escapeString(stream),
 	)
-
-	fmt.Println("-------------------------------------------------------------------------")
-	fmt.Println(query)
-	fmt.Println("-------------------------------------------------------------------------")
 
 	return db.PrepareContext(ctx, query)
 }

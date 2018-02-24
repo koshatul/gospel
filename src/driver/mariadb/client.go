@@ -1,6 +1,7 @@
 package mariadb
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/go-sql-driver/mysql"
@@ -51,13 +52,23 @@ func Open(dsn string) (*Client, error) {
 	return &Client{db}, nil
 }
 
-// GetStore returns an event store by name.
-func (c *Client) GetStore(name string) (*EventStore, error) {
-	if err := c.db.Ping(); err != nil {
-		return nil, err
+// OpenStore returns an event store by name.
+//
+// ctx applies to the opening of the store, and not to the store itself.
+func (c *Client) OpenStore(ctx context.Context, name string) (es *EventStore, err error) {
+	var id int64
+
+	res, err := c.db.ExecContext(ctx, `INSERT INTO store SET name = ?`, name)
+
+	if isDuplicateEntry(err) {
+		row := c.db.QueryRowContext(ctx, `SELECT id FROM store WHERE name = ?`, name)
+		err = row.Scan(&id)
+	} else if err == nil {
+		id, err = res.LastInsertId()
 	}
 
-	return &EventStore{c.db, name}, nil
+	es = &EventStore{c.db, uint64(id)}
+	return
 }
 
 // Close closes the database connection.

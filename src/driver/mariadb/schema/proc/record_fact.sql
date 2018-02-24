@@ -6,7 +6,7 @@
 --
 CREATE FUNCTION IF NOT EXISTS record_fact
 (
-    p_store    VARBINARY(255),
+    p_store_id BIGINT UNSIGNED,
     p_stream   VARBINARY(255),
     p_event_id BIGINT UNSIGNED
 )
@@ -20,7 +20,7 @@ BEGIN
     SELECT offset + 1
         INTO v_offset
         FROM fact
-    WHERE store = p_store
+    WHERE store_id = p_store_id
         AND stream = p_stream
         ORDER BY offset DESC
         LIMIT 1
@@ -31,7 +31,7 @@ BEGIN
     END IF;
 
     INSERT INTO fact SET
-        store    = p_store,
+        store_id = p_store_id,
         stream   = p_stream,
         offset   = v_offset,
         event_id = p_event_id;

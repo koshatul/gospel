@@ -1,0 +1,7 @@
+--
+-- store is a mapping of name to event store ID.
+--
+CREATE TABLE IF NOT EXISTS store(
+   id   BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+   name VARBINARY(255) NOT NULL UNIQUE
+) ROW_FORMAT=COMPRESSED;

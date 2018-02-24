@@ -12,7 +12,7 @@ import (
 func atomicAppend(
 	ctx context.Context,
 	db *sql.DB,
-	store string,
+	storeID uint64,
 	addr *streakdb.Address,
 	events []streakdb.Event,
 	strategy appendStrategy,
@@ -23,7 +23,7 @@ func atomicAppend(
 	}
 	defer tx.Rollback()
 
-	if err := strategy(ctx, tx, store, addr, events); err != nil {
+	if err := strategy(ctx, tx, storeID, addr, events); err != nil {
 		return err
 	}
 
@@ -37,7 +37,7 @@ func atomicAppend(
 type appendStrategy func(
 	ctx context.Context,
 	tx *sql.Tx,
-	store string,
+	storeID uint64,
 	addr *streakdb.Address,
 	events []streakdb.Event,
 ) error
@@ -47,7 +47,7 @@ type appendStrategy func(
 func appendChecked(
 	ctx context.Context,
 	tx *sql.Tx,
-	store string,
+	storeID uint64,
 	addr *streakdb.Address,
 	events []streakdb.Event,
 ) error {
@@ -55,7 +55,7 @@ func appendChecked(
 		row := tx.QueryRowContext(
 			ctx,
 			`SELECT append_checked(?, ?, ?, ?, ?, ?)`,
-			store,
+			storeID,
 			addr.Stream,
 			addr.Offset,
 			ev.EventType,
@@ -83,7 +83,7 @@ func appendChecked(
 func appendUnchecked(
 	ctx context.Context,
 	tx *sql.Tx,
-	store string,
+	storeID uint64,
 	addr *streakdb.Address,
 	events []streakdb.Event,
 ) error {
@@ -91,7 +91,7 @@ func appendUnchecked(
 		row := tx.QueryRowContext(
 			ctx,
 			`SELECT append_unchecked(?, ?, ?, ?, ?)`,
-			store,
+			storeID,
 			addr.Stream,
 			ev.EventType,
 			ev.ContentType,

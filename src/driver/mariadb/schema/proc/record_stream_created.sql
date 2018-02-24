@@ -6,18 +6,17 @@
 --
 CREATE PROCEDURE IF NOT EXISTS record_stream_created
 (
-    p_store  VARBINARY(255),
-    p_stream VARBINARY(255)
+    p_store_id BIGINT UNSIGNED,
+    p_stream   VARBINARY(255)
 )
 NOT DETERMINISTIC
 MODIFIES SQL DATA
 SQL SECURITY DEFINER
 BEGIN
     SELECT record_fact(
-        p_store,
+        p_store_id,
         "",
         store_event(
-            p_store,
             "$stream.created",
             "application/vnd.streakdb.stream.created.v1",
             p_stream

@@ -3,8 +3,10 @@
 package mariadb_test
 
 import (
+	"context"
 	"database/sql"
 	"os"
+	"time"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/jmalloc/streakdb/src/driver/mariadb"
@@ -32,8 +34,11 @@ func getTestClient() *mariadb.Client {
 
 // getTestStore returns an EventStore that uses the test DSN.
 func getTestStore() (*mariadb.Client, *mariadb.EventStore) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
 	c := getTestClient()
-	es, err := c.GetStore("test")
+	es, err := c.OpenStore(ctx, "test")
 	if err != nil {
 		c.Close()
 		panic(err)
