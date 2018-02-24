@@ -20,7 +20,9 @@ var _ = Describe("Reader", func() {
 		client *Client
 		store  *EventStore
 		reader streakdb.Reader
-		addr   streakdb.Address
+
+		addr streakdb.Address
+		opts []streakdb.ReaderOption
 	)
 
 	BeforeEach(func() {
@@ -33,9 +35,9 @@ var _ = Describe("Reader", func() {
 		_, err := store.AppendUnchecked(
 			ctx,
 			"test-stream",
-			streakdb.Event{EventType: "event-1"},
-			streakdb.Event{EventType: "event-2"},
-			streakdb.Event{EventType: "event-3"},
+			streakdb.Event{EventType: "event-type-1", Body: []byte("event-1")},
+			streakdb.Event{EventType: "event-type-2", Body: []byte("event-2")},
+			streakdb.Event{EventType: "event-type-3", Body: []byte("event-3")},
 		)
 		Expect(err).ShouldNot(HaveOccurred())
 
@@ -43,11 +45,12 @@ var _ = Describe("Reader", func() {
 			Stream: "test-stream",
 			Offset: 0,
 		}
+		opts = nil
 	})
 
 	JustBeforeEach(func() {
 		var err error
-		reader, err = store.Open(addr)
+		reader, err = store.Open(ctx, addr, opts...)
 		if err != nil {
 			panic(err)
 		}
@@ -95,9 +98,12 @@ var _ = Describe("Reader", func() {
 			f := reader.Get()
 
 			Expect(f).To(Equal(streakdb.Fact{
-				Addr:  addr,
-				Event: streakdb.Event{EventType: "event-1"},
-				Time:  f.Time, // perform fuzzy check for time below
+				Addr: addr,
+				Event: streakdb.Event{
+					EventType: "event-type-1",
+					Body:      []byte("event-1"),
+				},
+				Time: f.Time, // perform fuzzy check for time below
 			}))
 
 			// Use a loose comparison for time, as MariaDB is typically going
@@ -112,26 +118,26 @@ var _ = Describe("Reader", func() {
 		})
 
 		It("returns the expected facts", func() {
-			var types []string
+			var bodies [][]byte
 
 			for {
 				_, err := reader.Next(ctx)
 				Expect(err).ShouldNot(HaveOccurred())
 
-				types = append(
-					types,
-					reader.Get().Event.EventType,
+				bodies = append(
+					bodies,
+					reader.Get().Event.Body,
 				)
 
-				if len(types) == 3 {
+				if len(bodies) == 3 {
 					break
 				}
 			}
 
-			Expect(types).To(Equal([]string{
-				"event-1",
-				"event-2",
-				"event-3",
+			Expect(bodies).To(Equal([][]byte{
+				[]byte("event-1"),
+				[]byte("event-2"),
+				[]byte("event-3"),
 			}))
 		})
 
@@ -149,6 +155,45 @@ var _ = Describe("Reader", func() {
 			f3 := reader.Get()
 			Expect(f3).NotTo(Equal(f1))
 		})
+	})
 
+	Context("when using an event-type filter", func() {
+		BeforeEach(func() {
+			opts = append(opts, streakdb.FilterByEventType(
+				"event-type-1",
+				"event-type-3",
+			))
+		})
+
+		Describe("Next", func() {
+			It("returns the address of the next unfiltered fact", func() {
+				nx, err := reader.Next(ctx)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(nx).To(Equal(addr.Next().Next())) // second fact is filtered
+			})
+
+			It("skips over filtered facts", func() {
+				var bodies [][]byte
+
+				for {
+					_, err := reader.Next(ctx)
+					Expect(err).ShouldNot(HaveOccurred())
+
+					bodies = append(
+						bodies,
+						reader.Get().Event.Body,
+					)
+
+					if len(bodies) == 2 {
+						break
+					}
+				}
+
+				Expect(bodies).To(Equal([][]byte{
+					[]byte("event-1"),
+					[]byte("event-3"),
+				}))
+			})
+		})
 	})
 })

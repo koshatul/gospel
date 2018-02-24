@@ -6,7 +6,6 @@ import (
 
 	"github.com/jmalloc/streakdb/src/driver"
 	"github.com/jmalloc/streakdb/src/streakdb"
-	"golang.org/x/time/rate"
 )
 
 // EventStore an interface for reading and writing streams of events stored in
@@ -60,27 +59,20 @@ func (es *EventStore) AppendUnchecked(
 }
 
 // Open returns a reader that begins reading facts at addr.
+//
+// ctx applies to the opening of the reader, and not to the reader itself.
 func (es *EventStore) Open(
+	ctx context.Context,
 	addr streakdb.Address,
 	opts ...streakdb.ReaderOption,
 ) (streakdb.Reader, error) {
-	var o driver.ReaderOptions
-
-	for _, fn := range opts {
-		fn(&o)
-	}
-
-	if o.EventTypes != nil {
-		panic("event type filtering is not supported")
-	}
-
-	return newReader(
+	return openReader(
+		ctx,
 		es.db,
-		rate.NewLimiter(rate.Inf, 1), // TODO: use reader option
 		es.name,
-		10, // lookahead -- TODO: use reader option
 		addr,
-	), nil
+		driver.NewReaderOptions(opts),
+	)
 }
 
 // append writes events to a stream using the given append strategy.

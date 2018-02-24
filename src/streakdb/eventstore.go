@@ -29,5 +29,7 @@ type EventStore interface {
 	AppendUnchecked(ctx context.Context, stream string, ev ...Event) (nx Address, err error)
 
 	// Open returns a reader that begins reading facts at addr.
-	Open(addr Address, opts ...ReaderOption) (Reader, error)
+	//
+	// ctx applies to the opening of the reader, and not to the reader itself.
+	Open(ctx context.Context, addr Address, opts ...ReaderOption) (Reader, error)
 }

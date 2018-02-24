@@ -1,19 +1,22 @@
 package mariadb
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"strings"
 
+	"github.com/jmalloc/streakdb/src/driver"
 	"github.com/jmalloc/streakdb/src/streakdb"
 	"golang.org/x/time/rate"
 )
 
 // Reader is an interface for reading facts from a stream stored in MariaDB.
 type Reader struct {
-	db    *sql.DB
+	stmt  *sql.Stmt
 	limit *rate.Limiter
-	store string
 
 	current *streakdb.Fact
 	next    *streakdb.Fact
@@ -21,39 +24,44 @@ type Reader struct {
 	done    chan error
 
 	addr   streakdb.Address
-	count  int
 	ctx    context.Context
 	cancel func()
 }
 
 var errReaderClosed = errors.New("reader is closed")
 
-// newReader returns a new reader that begins at addr.
-func newReader(
+// openReader returns a new reader that begins at addr.
+func openReader(
+	ctx context.Context,
 	db *sql.DB,
-	limit *rate.Limiter,
 	store string,
-	lookahead int,
 	addr streakdb.Address,
-) *Reader {
-	ctx, cancel := context.WithCancel(context.Background())
+	opts *driver.ReaderOptions,
+) (*Reader, error) {
+	stmt, err := prepareReaderStatement(ctx, db, opts, store, addr.Stream)
+	if err != nil {
+		return nil, err
+	}
+
+	// Note that runCtx is NOT derived from ctx, which is only used for the
+	// opening of the reader itself.
+	runCtx, cancel := context.WithCancel(context.Background())
 
 	r := &Reader{
-		db:    db,
-		limit: limit,
-		store: store,
+		stmt:  stmt,
+		limit: rate.NewLimiter(rate.Inf, 1), // TODO
 
-		facts: make(chan streakdb.Fact, lookahead),
+		facts: make(chan streakdb.Fact, 10), // TODO
 		done:  make(chan error, 1),
 
 		addr:   addr,
-		ctx:    ctx,
+		ctx:    runCtx,
 		cancel: cancel,
 	}
 
 	go r.run()
 
-	return r
+	return r, nil
 }
 
 // Next blocks until a fact is available for reading or ctx is canceled.
@@ -146,10 +154,19 @@ func (r *Reader) run() {
 }
 
 func (r *Reader) poll() error {
-	rows, err := r.fetch()
+	// always select enough facts to fill the lookahead buffer, plus 1 to
+	// make the send to f.facts block until more facts are needed.
+	limit := cap(r.facts) - len(r.facts) + 1
+
+	rows, err := r.stmt.QueryContext(
+		r.ctx,
+		r.addr.Offset,
+		limit,
+	)
 	if err != nil {
 		return err
 	}
+	defer rows.Close()
 
 	f := streakdb.Fact{
 		Addr: r.addr,
@@ -177,30 +194,90 @@ func (r *Reader) poll() error {
 	return nil
 }
 
-func (r *Reader) fetch() (*sql.Rows, error) {
-	// always select enough facts to fill the lookahead buffer, plus 1 to
-	// make the send to f.facts block until more facts are needed.
-	limit := cap(r.facts) - len(r.facts) + 1
+func prepareReaderStatement(
+	ctx context.Context,
+	db *sql.DB,
+	opts *driver.ReaderOptions,
+	store string,
+	stream string,
+) (*sql.Stmt, error) {
+	filter := ""
+	if opts.FilterByEventType {
+		types := strings.Join(escapeStrings(opts.EventTypes), `, `)
+		filter = `AND e.event_type IN (` + types + `)`
+	}
 
-	return r.db.QueryContext(
-		r.ctx,
+	query := fmt.Sprintf(
 		`SELECT
-            f.offset,
-            f.time,
-            e.event_type,
-            e.content_type,
-            e.body
-        FROM fact AS f
-        INNER JOIN event AS e
-        ON e.id = f.event_id
-        WHERE f.store = ?
-            AND f.stream = ?
-            AND f.offset >= ?
-        ORDER BY offset
-        LIMIT ?`,
-		r.store,
-		r.addr.Stream,
-		r.addr.Offset,
-		limit,
+			f.offset,
+			f.time,
+			e.event_type,
+			e.content_type,
+			e.body
+		FROM fact AS f
+		INNER JOIN event AS e
+		ON e.id = f.event_id
+		%s
+		WHERE f.store = %s
+			AND f.stream = %s
+			AND f.offset >= ?
+		ORDER BY offset
+		LIMIT ?`,
+		filter,
+		escapeString(store),
+		escapeString(stream),
 	)
+
+	fmt.Println("-------------------------------------------------------------------------")
+	fmt.Println(query)
+	fmt.Println("-------------------------------------------------------------------------")
+
+	return db.PrepareContext(ctx, query)
+}
+
+// escapeString returns a quoted and escaped representation of s.
+// Neither the Go sql package, nor the mysql driver currently expose string
+// escaping functions. See https://github.com/golang/go/issues/18478.
+func escapeString(s string) string {
+	var buf bytes.Buffer
+
+	buf.WriteRune('\'')
+
+	for _, r := range s {
+		switch r {
+		case '\x00':
+			buf.WriteString(`\0`)
+		case '\x1a':
+			buf.WriteString(`\Z`)
+		case '\r':
+			buf.WriteString(`\r`)
+		case '\n':
+			buf.WriteString(`\n`)
+		case '\b':
+			buf.WriteString(`\b`)
+		case '\t':
+			buf.WriteString(`\t`)
+		case '\\':
+			buf.WriteString(`\\`)
+		case '\'':
+			buf.WriteString(`\'`)
+		default:
+			buf.WriteRune(r)
+		}
+	}
+
+	buf.WriteRune('\'')
+
+	return buf.String()
+}
+
+// escapeStrings escapes a slice of strings.
+func escapeStrings(s []string) []string {
+	escaped := make([]string, len(s))
+
+	for i, v := range s {
+		escaped[i] = escapeString(v)
+	}
+
+	return escaped
 }
