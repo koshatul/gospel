@@ -132,6 +132,7 @@ func (r *Reader) Close() error {
 func (r *Reader) run() {
 	defer r.cancel()
 	defer close(r.done)
+	defer r.stmt.Close()
 
 	var err error
 
