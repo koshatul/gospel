@@ -91,12 +91,18 @@ func (c *Client) OpenStore(ctx context.Context, name string) (es *EventStore, er
 		row := c.db.QueryRowContext(ctx, `SELECT id FROM store WHERE name = ?`, name)
 		err = row.Scan(&id)
 	} else if err == nil {
+		c.logger.Log(
+			"created new event store named '%s'",
+			name,
+		)
+
 		id, err = res.LastInsertId()
 	}
 
 	es = &EventStore{
 		c.db,
 		uint64(id),
+		name,
 		c.logger,
 	}
 

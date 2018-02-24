@@ -17,8 +17,9 @@ type EventStore struct {
 	// readers it creates.
 	db *sql.DB
 
-	// id is the auto-increment ID of the store.
-	id uint64
+	// id and store are the auto-increment ID and name of the store, respectively.
+	id    uint64
+	store string
 
 	// logger is the logger to use for activity and debug logging.
 	logger twelf.Logger
@@ -42,7 +43,14 @@ func (es *EventStore) Append(
 	err := es.append(ctx, &addr, ev, appendChecked)
 
 	if err == nil {
-		logging.AppendChecked(es.logger, addr, ev)
+		logging.AppendChecked(
+			es.logger,
+			gospel.Address{
+				Stream: es.store + "::" + addr.Stream,
+				Offset: addr.Offset,
+			},
+			ev,
+		)
 	} else if e, ok := err.(gospel.ConflictError); ok {
 		logging.Conflict(es.logger, e)
 	}
@@ -69,7 +77,14 @@ func (es *EventStore) AppendUnchecked(
 	err := es.append(ctx, &addr, ev, appendUnchecked)
 
 	if err == nil {
-		logging.AppendUnchecked(es.logger, addr, ev)
+		logging.AppendUnchecked(
+			es.logger,
+			gospel.Address{
+				Stream: es.store + "::" + addr.Stream,
+				Offset: addr.Offset,
+			},
+			ev,
+		)
 	}
 
 	return addr, err
