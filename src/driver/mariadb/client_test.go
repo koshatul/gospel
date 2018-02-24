@@ -12,11 +12,11 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Open", func() {
+var _ = Describe("OpenEnv", func() {
 	AfterEach(destroyTestSchema)
 
 	It("returns a client", func() {
-		c, err := Open(getTestDSN())
+		c, err := OpenEnv()
 
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(c).NotTo(BeNil())

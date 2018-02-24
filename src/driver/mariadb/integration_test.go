@@ -12,19 +12,9 @@ import (
 	"github.com/jmalloc/gospel/src/driver/mariadb"
 )
 
-// getTestDSN returns the MariaDB DSN used for integration tests.
-func getTestDSN() string {
-	dsn := os.Getenv("GOSPEL_MARIADB_TEST_DSN")
-	if dsn != "" {
-		return dsn
-	}
-
-	return "gospel:gospel@tcp(127.0.0.1:3306)/gospel"
-}
-
 // getTestClient returns a Client that uses the test DSN.
 func getTestClient() *mariadb.Client {
-	c, err := mariadb.Open(getTestDSN())
+	c, err := mariadb.OpenEnv()
 	if err != nil {
 		panic(err)
 	}
@@ -50,12 +40,14 @@ func getTestStore() (*mariadb.Client, *mariadb.EventStore) {
 // destroyTestSchema removes all tables and procedures from the the database
 // schema specified by getTestDSN().
 func destroyTestSchema() {
-	cfg, err := mysql.ParseDSN(getTestDSN())
+	dsn := os.Getenv("GOSPEL_MARIADB_DSN")
+
+	cfg, err := mysql.ParseDSN(dsn)
 	if err != nil {
 		panic(err)
 	}
 
-	db, err := sql.Open("mysql", getTestDSN())
+	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		panic(err)
 	}

@@ -3,6 +3,8 @@ package mariadb
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"os"
 
 	"github.com/go-sql-driver/mysql"
 	schema "github.com/jmalloc/gospel/artifacts/mariadb"
@@ -50,6 +52,19 @@ func Open(dsn string) (*Client, error) {
 	}
 
 	return &Client{db}, nil
+}
+
+// OpenEnv returns a new Client instance for the MariaDB DSN described by
+// the GOSPEL_MARIADB_DSN environment variable.
+//
+// If the environment variable is not set,
+func OpenEnv() (*Client, error) {
+	dsn := os.Getenv("GOSPEL_MARIADB_DSN")
+	if dsn == "" {
+		return nil, errors.New("GOSPEL_MARIADB_DSN is not set.")
+	}
+
+	return Open(dsn)
 }
 
 // OpenStore returns an event store by name.

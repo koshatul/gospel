@@ -5,7 +5,7 @@ services:
 addons:
   mariadb: '10.2'
 env:
-- GOSPEL_MARIADB_TEST_DSN="travis@tcp(127.0.0.1:3306)/gospel"
+- GOSPEL_MARIADB_DSN="travis@tcp(127.0.0.1:3306)/gospel"
 before_install: mysql -e 'CREATE DATABASE gospel;'
 script: make ci
 after_script: bash <(curl -s https://codecov.io/bash)
