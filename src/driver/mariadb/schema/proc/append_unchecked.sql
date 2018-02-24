@@ -23,6 +23,7 @@ BEGIN
     END IF;
 
     SET v_event_id = store_event(
+        p_store_id,
         p_event_type,
         p_content_type,
         p_body

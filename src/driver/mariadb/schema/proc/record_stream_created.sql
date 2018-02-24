@@ -17,6 +17,7 @@ BEGIN
         p_store_id,
         "",
         store_event(
+            p_store_id,
             "$stream.created",
             "application/vnd.streakdb.stream.created.v1",
             p_stream
