@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"math/rand"
-	"strconv"
 	"time"
 
 	"github.com/jmalloc/gospel/src/gospel"
@@ -32,21 +31,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	var counter uint64
+	r, err := es.Open(ctx, gospel.Address{
+		Stream: "my-stream",
+		Offset: 0,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	for {
-		_, err := es.AppendUnchecked(
-			ctx,
-			"my-stream",
-			gospel.Event{
-				EventType: "example-event",
-				Body:      []byte(strconv.FormatUint(counter, 10)),
-			},
-		)
+		_, err := r.Next(ctx)
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		counter++
 
 		if rand.Intn(2) != 0 {
 			time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)

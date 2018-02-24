@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"math/rand"
 	"strconv"
 	"time"
 
@@ -51,7 +52,10 @@ FindOffset:
 		// Then proceed to use a checked append.
 		for {
 			counter++
-			time.Sleep(500 * time.Millisecond)
+
+			if rand.Intn(2) != 0 {
+				time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
+			}
 
 			addr, err = es.Append(
 				ctx,
@@ -69,4 +73,8 @@ FindOffset:
 			}
 		}
 	}
+}
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
 }

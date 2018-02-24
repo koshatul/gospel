@@ -101,6 +101,7 @@ func (es *EventStore) Open(
 	return openReader(
 		ctx,
 		es.db,
+		es.logger,
 		es.id,
 		addr,
 		driver.NewReaderOptions(opts),

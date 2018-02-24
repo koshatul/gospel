@@ -101,14 +101,14 @@ func (c *Client) OpenStore(ctx context.Context, name string) (*EventStore, error
 			return nil, err
 		}
 
-		c.logger.Log("opened existing event store '%s'", name)
+		c.logger.Debug("opened existing event store '%s'", name)
 	} else if err == nil {
 		id, err = res.LastInsertId()
 		if err != nil {
 			return nil, err
 		}
 
-		c.logger.Log("created new event store '%s'", name)
+		c.logger.Debug("created new event store '%s'", name)
 	} else {
 		return nil, err
 	}

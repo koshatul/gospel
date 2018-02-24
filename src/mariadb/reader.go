@@ -6,17 +6,21 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/jmalloc/gospel/src/gospel"
 	"github.com/jmalloc/gospel/src/internal/driver"
+	"github.com/jmalloc/twelf/src/twelf"
 	"golang.org/x/time/rate"
 )
 
 // Reader is an interface for reading facts from a stream stored in MariaDB.
 type Reader struct {
-	stmt  *sql.Stmt
-	limit *rate.Limiter
+	stmt   *sql.Stmt
+	limit  *rate.Limiter
+	opts   *driver.ReaderOptions
+	logger twelf.Logger
 
 	current *gospel.Fact
 	next    *gospel.Fact
@@ -34,6 +38,7 @@ var errReaderClosed = errors.New("reader is closed")
 func openReader(
 	ctx context.Context,
 	db *sql.DB,
+	logger twelf.Logger,
 	storeID uint64,
 	addr gospel.Address,
 	opts *driver.ReaderOptions,
@@ -48,10 +53,15 @@ func openReader(
 	runCtx, cancel := context.WithCancel(context.Background())
 
 	r := &Reader{
-		stmt:  stmt,
-		limit: rate.NewLimiter(rate.Inf, 1), // TODO
+		stmt: stmt,
+		limit: rate.NewLimiter(
+			20, // polls per second
+			1,
+		), // TODO make option
+		opts:   opts,
+		logger: logger,
 
-		facts: make(chan gospel.Fact, 10), // TODO
+		facts: make(chan gospel.Fact, 50), // TODO make option
 		done:  make(chan error, 1),
 
 		addr:   addr,
@@ -99,8 +109,21 @@ func (r *Reader) Next(ctx context.Context) (addr gospel.Address, err error) {
 	case f := <-r.facts:
 		r.next = &f
 		addr = r.next.Addr
+
+		r.logger.Debug(
+			"[reader %p] advanced to '%s', next is '%s'",
+			r,
+			r.current,
+			r.next,
+		)
 	default:
 		addr = r.current.Addr.Next()
+
+		r.logger.Debug(
+			"[reader %p] advanced to '%s', next is not yet available",
+			r,
+			r.current,
+		)
 	}
 
 	return
@@ -134,6 +157,26 @@ func (r *Reader) run() {
 	defer close(r.done)
 	defer r.stmt.Close()
 
+	if r.logger.IsDebug() {
+		filter := "*"
+		if r.opts.FilterByEventType {
+			filter = strings.Join(r.opts.EventTypes, ", ")
+		}
+
+		r.logger.Debug(
+			"[reader %p] opened at %s (poll limit: %s/s, filter: %s)",
+			r,
+			r.addr,
+			strconv.FormatFloat(
+				float64(r.limit.Limit()),
+				'f',
+				-1,
+				64,
+			),
+			filter,
+		)
+	}
+
 	var err error
 
 	for {
@@ -155,9 +198,12 @@ func (r *Reader) run() {
 }
 
 func (r *Reader) poll() error {
-	// always select enough facts to fill the lookahead buffer, plus 1 to
-	// make the send to f.facts block until more facts are needed.
-	limit := cap(r.facts) - len(r.facts) + 1
+	// always select enough facts to fill the lookahead buffer with a minimum of
+	// one plus 1 to ensure the send to f.facts block until more facts are needed.
+	limit := cap(r.facts) - len(r.facts)
+	if limit == 0 {
+		limit = 1
+	}
 
 	rows, err := r.stmt.QueryContext(
 		r.ctx,
@@ -173,7 +219,11 @@ func (r *Reader) poll() error {
 		Addr: r.addr,
 	}
 
+	count := 0
+
 	for rows.Next() {
+		count++
+
 		if err := rows.Scan(
 			&f.Addr.Offset,
 			&f.Time,
@@ -184,12 +234,36 @@ func (r *Reader) poll() error {
 			return err
 		}
 
+		if r.logger.IsDebug() {
+			select {
+			case r.facts <- f:
+				r.addr = f.Addr.Next()
+				continue
+			default:
+			}
+
+			r.logger.Debug(
+				"[reader %p] worker blocked enqueueing '%s'",
+				r,
+				f,
+			)
+		}
+
 		select {
 		case r.facts <- f:
 			r.addr = f.Addr.Next()
 		case <-r.ctx.Done():
 			return r.ctx.Err()
 		}
+	}
+
+	if count != 0 {
+		r.logger.Debug(
+			"[reader %p] worker found %d of %d requested fact(s)",
+			r,
+			count,
+			limit,
+		)
 	}
 
 	return nil
