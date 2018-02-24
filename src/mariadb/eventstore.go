@@ -6,6 +6,8 @@ import (
 
 	"github.com/jmalloc/gospel/src/gospel"
 	"github.com/jmalloc/gospel/src/internal/driver"
+	"github.com/jmalloc/gospel/src/internal/logging"
+	"github.com/jmalloc/twelf/src/twelf"
 )
 
 // EventStore an interface for reading and writing streams of events stored in
@@ -17,6 +19,9 @@ type EventStore struct {
 
 	// id is the auto-increment ID of the store.
 	id uint64
+
+	// logger is the logger to use for activity and debug logging.
+	logger twelf.Logger
 }
 
 // Append atomically writes one or more events to the end of a stream,
@@ -35,6 +40,13 @@ func (es *EventStore) Append(
 	ev ...gospel.Event,
 ) (gospel.Address, error) {
 	err := es.append(ctx, &addr, ev, appendChecked)
+
+	if err == nil {
+		logging.AppendChecked(es.logger, addr, ev)
+	} else if e, ok := err.(gospel.ConflictError); ok {
+		logging.Conflict(es.logger, e)
+	}
+
 	return addr, err
 }
 
@@ -55,6 +67,11 @@ func (es *EventStore) AppendUnchecked(
 ) (gospel.Address, error) {
 	addr := gospel.Address{Stream: stream}
 	err := es.append(ctx, &addr, ev, appendUnchecked)
+
+	if err == nil {
+		logging.AppendUnchecked(es.logger, addr, ev)
+	}
+
 	return addr, err
 }
 

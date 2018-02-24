@@ -1,7 +1,7 @@
 package driver
 
-// ReaderOptions is a struct that contains the options applied by
-// gospel.ReaderOption functions.
+// ReaderOptions is a struct that contains the options applied by ReaderOption
+// functions.
 type ReaderOptions struct {
 	FilterByEventType bool
 	EventTypes        []string

@@ -8,6 +8,9 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 	schema "github.com/jmalloc/gospel/artifacts/mariadb"
+	"github.com/jmalloc/gospel/src/gospel"
+	"github.com/jmalloc/gospel/src/internal/driver"
+	"github.com/jmalloc/twelf/src/twelf"
 	"github.com/uber-go/multierr"
 )
 
@@ -18,10 +21,16 @@ type Client struct {
 	// db is the pool of MariaDB connections used by the event stores accessed
 	// through this client.
 	db *sql.DB
+
+	// logger is the logger to use for activity and debug logging. It is
+	// inherited by all event stores and their readers.
+	logger twelf.Logger
 }
 
 // Open returns a new Client instance for the given MariaDB DSN.
-func Open(dsn string) (*Client, error) {
+func Open(dsn string, opts ...gospel.Option) (*Client, error) {
+	o := driver.NewClientOptions(opts)
+
 	cfg, err := mysql.ParseDSN(dsn)
 	if err != nil {
 		return nil, err
@@ -51,7 +60,10 @@ func Open(dsn string) (*Client, error) {
 		)
 	}
 
-	return &Client{db}, nil
+	return &Client{
+		db,
+		o.Logger,
+	}, nil
 }
 
 // OpenEnv returns a new Client instance for the MariaDB DSN described by
@@ -82,7 +94,12 @@ func (c *Client) OpenStore(ctx context.Context, name string) (es *EventStore, er
 		id, err = res.LastInsertId()
 	}
 
-	es = &EventStore{c.db, uint64(id)}
+	es = &EventStore{
+		c.db,
+		uint64(id),
+		c.logger,
+	}
+
 	return
 }
 

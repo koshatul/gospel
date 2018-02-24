@@ -69,7 +69,10 @@ func appendChecked(
 		}
 
 		if !ok {
-			return gospel.ConflictError{Addr: *addr}
+			return gospel.ConflictError{
+				Addr:  *addr,
+				Event: ev,
+			}
 		}
 
 		addr.Offset++
