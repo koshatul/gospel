@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math/rand"
 	"strconv"
@@ -53,8 +54,10 @@ FindOffset:
 		for {
 			counter++
 
-			if rand.Intn(2) != 0 {
-				time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
+			if rand.Intn(10) == 0 {
+				d := time.Duration(rand.Intn(60)) * time.Second
+				fmt.Println("SLEEP", d)
+				time.Sleep(d)
 			}
 
 			addr, err = es.Append(

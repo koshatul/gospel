@@ -12,6 +12,7 @@ import (
 	"github.com/jmalloc/gospel/src/internal/driver"
 	"github.com/jmalloc/twelf/src/twelf"
 	"github.com/uber-go/multierr"
+	"golang.org/x/time/rate"
 )
 
 // Client is a connection to a MariaDB server.
@@ -21,6 +22,11 @@ type Client struct {
 	// db is the pool of MariaDB connections used by the event stores accessed
 	// through this client.
 	db *sql.DB
+
+	// rlimit is a rate-limiter that limits the number of polling queries that
+	// can be performed each second. It is shared by all readers, and hence
+	// provides a global cap of the number of read queries per second.
+	rlimit *rate.Limiter
 
 	// logger is the logger to use for activity and debug logging. It is
 	// inherited by all event stores and their readers.
@@ -69,6 +75,7 @@ func Open(dsn string, opts ...gospel.Option) (*Client, error) {
 
 	return &Client{
 		db,
+		rate.NewLimiter(60, 1), // TODO, allow configuration
 		o.Logger,
 	}, nil
 }
@@ -117,6 +124,7 @@ func (c *Client) OpenStore(ctx context.Context, name string) (*EventStore, error
 		c.db,
 		uint64(id),
 		name,
+		c.rlimit,
 		c.logger,
 	}, nil
 }

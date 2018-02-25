@@ -1,72 +1,115 @@
 package mariadb
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jmalloc/gospel/src/gospel"
 	"github.com/jmalloc/gospel/src/internal/driver"
 	"github.com/jmalloc/twelf/src/twelf"
+	"github.com/jpillora/backoff"
 	"golang.org/x/time/rate"
 )
 
 // Reader is an interface for reading facts from a stream stored in MariaDB.
 type Reader struct {
-	stmt   *sql.Stmt
-	limit  *rate.Limiter
-	opts   *driver.ReaderOptions
+	// stmt is a prepared statement used to query for facts.
+	// It accepts two parameters, stream offset and limit.
+	stmt *sql.Stmt
+
+	// backoff describes the exponential-backoff policy to be used when a poll
+	// query produces no results, i.e. when the reader has reached the end of
+	// a stream.
+	backoff *backoff.Backoff
+
+	// limit is a rate-limiter that limits the number of polling queries that
+	// can be performed each second. It is shared by all readers, and hence
+	// provides a global cap of the number of read queries per second.
+	limit *rate.Limiter
+
+	// logger is the target for debug logging. readers do not perform activity
+	// logging.
 	logger twelf.Logger
 
-	current *gospel.Fact
-	next    *gospel.Fact
-	facts   chan gospel.Fact
-	done    chan error
+	// opts is the options specified when opening the reader.
+	opts *driver.ReaderOptions
 
-	addr   gospel.Address
+	// facts is a channel on which facts are delivered to the caller of Next().
+	// A worker goroutine polls the database and delivers the facts to this
+	// channel.
+	facts chan gospel.Fact
+
+	// current is the "current" fact which is returned by Get() until Next() is
+	// called again.
+	current *gospel.Fact
+
+	// next is the "next" fact, after "current". It is read from the facts
+	// channel when a call to Next() to improve the accuracy of Next()'s 'nx'
+	// output parameter (rather than just returning r.current.Addr().Next()).
+	next *gospel.Fact
+
+	// done is a signaling channel which is closed when the worker goroutine
+	// returns. The error that caused the closure, if any, is sent to the
+	// channel before it closed. This means a pending call to Next() will return
+	// the error when it first occurs, but subsequent calls will return a more
+	// generic "reader is closed" error.
+	done chan error
+
+	// ctx is a context that is canceled when Close() is called, or when the
+	// worker goroutine returns. It is used to abort any in-progress database
+	// queries when the reader is closed.
+	//
+	// Context cancellation errors are not sent to the 'done' channel, so any
+	// pending Next() call will receive a generic "reader is closed" error.
 	ctx    context.Context
 	cancel func()
+
+	// addr is the starting address for the next database poll.
+	addr gospel.Address
 }
 
+// errReaderClosed is an error returned by Next() when it is called on a closed
+// reader, or when the reader is closed while a call to Next() is pending.
 var errReaderClosed = errors.New("reader is closed")
 
 // openReader returns a new reader that begins at addr.
 func openReader(
 	ctx context.Context,
 	db *sql.DB,
-	logger twelf.Logger,
 	storeID uint64,
 	addr gospel.Address,
+	limit *rate.Limiter,
+	logger twelf.Logger,
 	opts *driver.ReaderOptions,
 ) (*Reader, error) {
-	stmt, err := prepareReaderStatement(ctx, db, opts, storeID, addr.Stream)
-	if err != nil {
-		return nil, err
-	}
-
 	// Note that runCtx is NOT derived from ctx, which is only used for the
 	// opening of the reader itself.
 	runCtx, cancel := context.WithCancel(context.Background())
 
+	// Create a read-buffer smaller than the lookahead amount so that
+	// the worker tends to block when queuing the last fact from each poll.
+	size := getLookahead(opts)
+	if size != 0 {
+		size--
+	}
+
 	r := &Reader{
-		stmt: stmt,
-		limit: rate.NewLimiter(
-			20, // polls per second
-			1,
-		), // TODO make option
-		opts:   opts,
+		limit:  limit,
 		logger: logger,
-
-		facts: make(chan gospel.Fact, 50), // TODO make option
-		done:  make(chan error, 1),
-
-		addr:   addr,
+		opts:   opts,
+		facts:  make(chan gospel.Fact, size),
+		done:   make(chan error, 1),
 		ctx:    runCtx,
 		cancel: cancel,
+		addr:   addr,
+	}
+
+	if err := r.init(ctx, db, storeID); err != nil {
+		return nil, err
 	}
 
 	go r.run()
@@ -78,14 +121,13 @@ func openReader(
 //
 // If err is nil, the "current" fact is ready to be returned by Get().
 //
-// addr is the offset within the stream that the reader has reached. It
-// can be used to efficiently resume reading in a future call to
-// EventStore.Open().
+// nx is the offset within the stream that the reader has reached. It can be
+// used to efficiently resume reading in a future call to EventStore.Open().
 //
-// Note that addr is not always the address immediately following the fact
-// returned by Get() - it may be "further ahead" in the stream, skipping
+// Note that nx is not always the address immediately following the fact
+// returned by Get() - it may be "further ahead" in the stream, this skipping
 // over any facts that the reader is not interested in.
-func (r *Reader) Next(ctx context.Context) (addr gospel.Address, err error) {
+func (r *Reader) Next(ctx context.Context) (nx gospel.Address, err error) {
 	if r.next == nil {
 		select {
 		case f := <-r.facts:
@@ -108,7 +150,7 @@ func (r *Reader) Next(ctx context.Context) (addr gospel.Address, err error) {
 	select {
 	case f := <-r.facts:
 		r.next = &f
-		addr = r.next.Addr
+		nx = r.next.Addr
 
 		r.logger.Debug(
 			"[reader %p] advanced to '%s', next is '%s'",
@@ -117,7 +159,8 @@ func (r *Reader) Next(ctx context.Context) (addr gospel.Address, err error) {
 			r.next,
 		)
 	default:
-		addr = r.current.Addr.Next()
+		// assume next is literally the next fact on the stream
+		nx = r.current.Addr.Next()
 
 		r.logger.Debug(
 			"[reader %p] advanced to '%s', next is not yet available",
@@ -152,133 +195,26 @@ func (r *Reader) Close() error {
 	}
 }
 
-func (r *Reader) run() {
-	defer r.cancel()
-	defer close(r.done)
-	defer r.stmt.Close()
-
-	if r.logger.IsDebug() {
-		filter := "*"
-		if r.opts.FilterByEventType {
-			filter = strings.Join(r.opts.EventTypes, ", ")
-		}
-
-		r.logger.Debug(
-			"[reader %p] opened at %s (poll limit: %s/s, filter: %s)",
-			r,
-			r.addr,
-			strconv.FormatFloat(
-				float64(r.limit.Limit()),
-				'f',
-				-1,
-				64,
-			),
-			filter,
-		)
-	}
-
-	var err error
-
-	for {
-		err = r.limit.Wait(r.ctx)
-		if err != nil {
-			break
-		}
-
-		err = r.poll()
-		if err != nil {
-			break
-		}
-
-	}
-
-	if err != context.Canceled {
-		r.done <- err
-	}
-}
-
-func (r *Reader) poll() error {
-	// always select enough facts to fill the lookahead buffer with a minimum of
-	// one plus 1 to ensure the send to f.facts block until more facts are needed.
-	limit := cap(r.facts) - len(r.facts)
-	if limit == 0 {
-		limit = 1
-	}
-
-	rows, err := r.stmt.QueryContext(
-		r.ctx,
-		r.addr.Offset,
-		limit,
-	)
-	if err != nil {
+// init intialises the reader based on r.opts.
+func (r *Reader) init(ctx context.Context, db *sql.DB, storeID uint64) error {
+	if err := r.prepareStatement(ctx, db, storeID); err != nil {
 		return err
 	}
-	defer rows.Close()
 
-	f := gospel.Fact{
-		Addr: r.addr,
-	}
-
-	count := 0
-
-	for rows.Next() {
-		count++
-
-		if err := rows.Scan(
-			&f.Addr.Offset,
-			&f.Time,
-			&f.Event.EventType,
-			&f.Event.ContentType,
-			&f.Event.Body,
-		); err != nil {
-			return err
-		}
-
-		if r.logger.IsDebug() {
-			select {
-			case r.facts <- f:
-				r.addr = f.Addr.Next()
-				continue
-			default:
-			}
-
-			r.logger.Debug(
-				"[reader %p] worker blocked enqueueing '%s'",
-				r,
-				f,
-			)
-		}
-
-		select {
-		case r.facts <- f:
-			r.addr = f.Addr.Next()
-		case <-r.ctx.Done():
-			return r.ctx.Err()
-		}
-	}
-
-	if count != 0 {
-		r.logger.Debug(
-			"[reader %p] worker found %d of %d requested fact(s)",
-			r,
-			count,
-			limit,
-		)
+	r.backoff = &backoff.Backoff{
+		Jitter: true,
+		Max:    1 * time.Second, // TODO: allow configuration via options
 	}
 
 	return nil
 }
 
-func prepareReaderStatement(
-	ctx context.Context,
-	db *sql.DB,
-	opts *driver.ReaderOptions,
-	storeID uint64,
-	stream string,
-) (*sql.Stmt, error) {
+// prepareStatement creates r.stmt, an SQL prepared statement used to poll
+// for new facts.
+func (r *Reader) prepareStatement(ctx context.Context, db *sql.DB, storeID uint64) error {
 	filter := ""
-	if opts.FilterByEventType {
-		types := strings.Join(escapeStrings(opts.EventTypes), `, `)
+	if r.opts.FilterByEventType {
+		types := strings.Join(escapeStrings(r.opts.EventTypes), `, `)
 		filter = `AND e.event_type IN (` + types + `)`
 	}
 
@@ -300,55 +236,133 @@ func prepareReaderStatement(
 		LIMIT ?`,
 		filter,
 		storeID,
-		escapeString(stream),
+		escapeString(r.addr.Stream),
 	)
 
-	return db.PrepareContext(ctx, query)
+	stmt, err := db.PrepareContext(ctx, query)
+	if err != nil {
+		return err
+	}
+
+	r.stmt = stmt
+	return nil
 }
 
-// escapeString returns a quoted and escaped representation of s.
-// Neither the Go sql package, nor the mysql driver currently expose string
-// escaping functions. See https://github.com/golang/go/issues/18478.
-func escapeString(s string) string {
-	var buf bytes.Buffer
+// run polls the database for facts and sends them to r.facts until r.ctx is
+// canceled or an error occurs.
+func (r *Reader) run() {
+	defer r.cancel()
+	defer close(r.done)
+	defer r.stmt.Close()
 
-	buf.WriteRune('\'')
+	if r.logger.IsDebug() {
+		filter := "*"
+		if r.opts.FilterByEventType {
+			filter = strings.Join(r.opts.EventTypes, ", ")
+		}
 
-	for _, r := range s {
-		switch r {
-		case '\x00':
-			buf.WriteString(`\0`)
-		case '\x1a':
-			buf.WriteString(`\Z`)
-		case '\r':
-			buf.WriteString(`\r`)
-		case '\n':
-			buf.WriteString(`\n`)
-		case '\b':
-			buf.WriteString(`\b`)
-		case '\t':
-			buf.WriteString(`\t`)
-		case '\\':
-			buf.WriteString(`\\`)
-		case '\'':
-			buf.WriteString(`\'`)
-		default:
-			buf.WriteRune(r)
+		r.logger.Debug(
+			"[reader %p] opened at %s (poll limit: %.02f/s, filter: %s)",
+			r,
+			r.addr,
+			float64(r.limit.Limit()),
+			filter,
+		)
+	}
+
+	var err error
+
+	for err == nil {
+		err = r.tick()
+	}
+
+	if err != context.Canceled {
+		r.done <- err
+	}
+}
+
+// tick executes one pass of the worker goroutine.
+func (r *Reader) tick() error {
+	if err := r.limit.Wait(r.ctx); err != nil {
+		return err
+	}
+
+	limit := getLookahead(r.opts) - len(r.facts)
+
+	count, err := r.poll(limit)
+	if err != nil {
+		return err
+	}
+
+	if count > 0 || r.backoff.Attempt() == 0 {
+		r.logger.Debug(
+			"[reader %p] worker found %d of %d requested fact(s)",
+			r,
+			count,
+			limit,
+		)
+	}
+
+	if count == limit {
+		r.backoff.Reset()
+
+		return nil
+	}
+
+	d := r.backoff.Duration()
+
+	r.logger.Debug(
+		"[reader %p] worker is backing off for %s",
+		r,
+		d,
+	)
+
+	select {
+	case <-time.After(d):
+		return nil
+	case <-r.ctx.Done():
+		return r.ctx.Err()
+	}
+}
+
+// fetch queries the database for facts beginning at r.addr.
+func (r *Reader) poll(limit int) (int, error) {
+
+	rows, err := r.stmt.QueryContext(
+		r.ctx,
+		r.addr.Offset,
+		limit,
+	)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	f := gospel.Fact{
+		Addr: r.addr,
+	}
+
+	count := 0
+
+	for rows.Next() {
+		if err := rows.Scan(
+			&f.Addr.Offset,
+			&f.Time,
+			&f.Event.EventType,
+			&f.Event.ContentType,
+			&f.Event.Body,
+		); err != nil {
+			return count, err
+		}
+
+		select {
+		case r.facts <- f:
+			r.addr = f.Addr.Next()
+			count++
+		case <-r.ctx.Done():
+			return count, r.ctx.Err()
 		}
 	}
 
-	buf.WriteRune('\'')
-
-	return buf.String()
-}
-
-// escapeStrings escapes a slice of strings.
-func escapeStrings(s []string) []string {
-	escaped := make([]string, len(s))
-
-	for i, v := range s {
-		escaped[i] = escapeString(v)
-	}
-
-	return escaped
+	return count, nil
 }

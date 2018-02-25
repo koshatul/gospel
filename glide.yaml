@@ -8,6 +8,8 @@ import:
   subpackages:
   - rate
 - package: github.com/jmalloc/twelf
+- package: github.com/jpillora/backoff
+  version: ~1.0.0
 testImport:
 - package: github.com/onsi/gomega
   version: ~1.3.0

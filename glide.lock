@@ -1,10 +1,14 @@
-hash: 7fc1bed88c5f6f47325b9c11bcf4ed8583c30d44895e9b24040982eb3e30711b
-updated: 2018-02-24T17:24:06.521126+10:00
+hash: 8d49e50fcf3a1a79ccd6a5dc4631e1d441b4a7435cc457ce6bc05491a8e7d426
+updated: 2018-02-25T08:43:58.225206+10:00
 imports:
 - name: github.com/go-sql-driver/mysql
   version: bc14601d1bd56421dd60f561e6052c9ed77f9daf
 - name: github.com/jmalloc/twelf
   version: ffe2c64ef8c5e93b1410e818808fe4fddfb5e02d
+  subpackages:
+  - src/twelf
+- name: github.com/jpillora/backoff
+  version: 8eab2debe79d12b7bd3d10653910df25fa9552ba
 - name: github.com/uber-go/multierr
   version: 3c4937480c32f4c13a875a1829af76c98ca3d40a
 - name: go.uber.org/atomic

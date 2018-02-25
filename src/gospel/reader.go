@@ -12,14 +12,13 @@ type Reader interface {
 	//
 	// If err is nil, the "current" fact is ready to be returned by Get().
 	//
-	// addr is the offset within the stream that the reader has reached. It
-	// can be used to efficiently resume reading in a future call to
-	// EventStore.Open().
+	// nx is the offset within the stream that the reader has reached. It can be
+	// used to efficiently resume reading in a future call to EventStore.Open().
 	//
-	// Note that addr is not always the address immediately following the fact
-	// returned by Get() - it may be "further ahead" in the stream, skipping
-	// over any facts that the reader is not interested in.
-	Next(ctx context.Context) (addr Address, err error)
+	// Note that nx is not always the address immediately following the fact
+	// returned by Get() - it may be "further ahead" in the stream, thus
+	// skipping over any facts that the reader is not interested in.
+	Next(ctx context.Context) (nx Address, err error)
 
 	// Get returns the "current" fact.
 	//

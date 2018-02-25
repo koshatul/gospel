@@ -8,6 +8,7 @@ import (
 	"github.com/jmalloc/gospel/src/internal/driver"
 	"github.com/jmalloc/gospel/src/internal/logging"
 	"github.com/jmalloc/twelf/src/twelf"
+	"golang.org/x/time/rate"
 )
 
 // EventStore an interface for reading and writing streams of events stored in
@@ -20,6 +21,11 @@ type EventStore struct {
 	// id and store are the auto-increment ID and name of the store, respectively.
 	id    uint64
 	store string
+
+	// rlimit is a rate-limiter that limits the number of polling queries that
+	// can be performed each second. It is shared by all readers, and hence
+	// provides a global cap of the number of read queries per second.
+	rlimit *rate.Limiter
 
 	// logger is the logger to use for activity and debug logging.
 	logger twelf.Logger
@@ -101,9 +107,10 @@ func (es *EventStore) Open(
 	return openReader(
 		ctx,
 		es.db,
-		es.logger,
 		es.id,
 		addr,
+		es.rlimit,
+		es.logger,
 		driver.NewReaderOptions(opts),
 	)
 }
