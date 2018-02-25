@@ -34,6 +34,7 @@ func main() {
 	}
 
 	var counter uint64
+	var delay time.Duration
 
 FindOffset:
 	for {
@@ -54,11 +55,15 @@ FindOffset:
 		for {
 			counter++
 
-			if rand.Intn(10) == 0 {
-				d := time.Duration(rand.Intn(60)) * time.Second
-				fmt.Println("SLEEP", d)
+			if rand.Intn(100) == 0 {
+				delay = time.Duration(rand.Intn(150)) * time.Millisecond
+
+				d := time.Duration(rand.Intn(30)) * time.Second
+				fmt.Println("SLEEP", d, "THEN EVERY", delay)
 				time.Sleep(d)
 			}
+
+			time.Sleep(delay)
 
 			addr, err = es.Append(
 				ctx,

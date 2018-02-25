@@ -21,9 +21,8 @@ type Reader struct {
 	// It accepts two parameters, stream offset and limit.
 	stmt *sql.Stmt
 
-	// backoff describes the exponential-backoff policy to be used when a poll
-	// query produces no results, i.e. when the reader has reached the end of
-	// a stream.
+	// backoff is the exponential-backoff policy to be used in "starvation mode"
+	// which is entered when a poll query does not produce any facts.
 	backoff *backoff.Backoff
 
 	// limit is a rate-limiter that limits the number of polling queries that
@@ -70,6 +69,16 @@ type Reader struct {
 
 	// addr is the starting address for the next database poll.
 	addr gospel.Address
+
+	// emptyPolls keeps track of the number of database polls that have not
+	// returned any facts since the last poll that completely filled the
+	// lookahead buffer.
+	emptyPolls int
+
+	// pollInterval is the time between database polls in "starvation mode".
+	// The reader is in starvation mode when emptyPolls != 0, otherwise it is
+	// in "catch-up" mode.
+	pollInterval time.Duration
 }
 
 // errReaderClosed is an error returned by Next() when it is called on a closed
@@ -152,21 +161,21 @@ func (r *Reader) Next(ctx context.Context) (nx gospel.Address, err error) {
 		r.next = &f
 		nx = r.next.Addr
 
-		r.logger.Debug(
-			"[reader %p] advanced to '%s', next is '%s'",
-			r,
-			r.current,
-			r.next,
-		)
+		// r.logger.Debug(
+		// 	"[reader %p] advanced to '%s', next is '%s'",
+		// 	r,
+		// 	r.current,
+		// 	r.next,
+		// )
 	default:
 		// assume next is literally the next fact on the stream
 		nx = r.current.Addr.Next()
 
-		r.logger.Debug(
-			"[reader %p] advanced to '%s', next is not yet available",
-			r,
-			r.current,
-		)
+		// r.logger.Debug(
+		// 	"[reader %p] advanced to '%s', next is not yet available",
+		// 	r,
+		// 	r.current,
+		// )
 	}
 
 	return
@@ -203,7 +212,7 @@ func (r *Reader) init(ctx context.Context, db *sql.DB, storeID uint64) error {
 
 	r.backoff = &backoff.Backoff{
 		Jitter: true,
-		Max:    1 * time.Second, // TODO: allow configuration via options
+		Max:    3 * time.Second, // TODO: allow configuration via options
 	}
 
 	return nil
@@ -262,10 +271,11 @@ func (r *Reader) run() {
 		}
 
 		r.logger.Debug(
-			"[reader %p] opened at %s (poll limit: %.02f/s, filter: %s)",
+			"[reader %p] opened at %s (global poll limit: %.02f/s, starvation mode poll rate: %.02f/s, event-type filter: %s)",
 			r,
 			r.addr,
 			float64(r.limit.Limit()),
+			durationToRate(r.backoff.Max),
 			filter,
 		)
 	}
@@ -294,35 +304,76 @@ func (r *Reader) tick() error {
 		return err
 	}
 
-	if count > 0 || r.backoff.Attempt() == 0 {
-		r.logger.Debug(
-			"[reader %p] worker found %d of %d requested fact(s)",
-			r,
-			count,
-			limit,
-		)
+	if count == limit {
+		r.fullPoll(limit)
+	} else if count == 0 {
+		r.emptyPoll(limit)
+	} else {
+		r.shortPoll(count, limit)
 	}
 
-	if count == limit {
-		r.backoff.Reset()
-
+	if r.pollInterval == 0 {
 		return nil
 	}
 
-	d := r.backoff.Duration()
-
-	r.logger.Debug(
-		"[reader %p] worker is backing off for %s",
-		r,
-		d,
-	)
-
 	select {
-	case <-time.After(d):
+	case <-time.After(r.pollInterval):
 		return nil
 	case <-r.ctx.Done():
 		return r.ctx.Err()
 	}
+}
+
+// fullPoll is called after a poll produces enough facts to fill the lookahead
+// buffer.
+func (r *Reader) fullPoll(limit int) {
+	message := "[reader %p] fetched %d of %d fact(s)"
+
+	if r.emptyPolls != 0 {
+		message += ", entering catch-up mode"
+	}
+
+	r.logger.Debug(message, r, limit, limit)
+
+	r.emptyPolls = 0
+	r.pollInterval = 0
+}
+
+// shortPoll is called after poll produces some facts, but not enough to fill
+// the lookahead buffer.
+func (r *Reader) shortPoll(count, limit int) {
+	r.logger.Debug(
+		"[reader %p] fetched %d of %d fact(s)",
+		r,
+		count,
+		limit,
+	)
+}
+
+// emptyPoll is called after a poll does not produce any facts.
+func (r *Reader) emptyPoll(limit int) {
+	delay := r.backoff.ForAttempt(float64(r.emptyPolls))
+
+	if r.emptyPolls == 0 {
+		r.pollInterval = delay
+
+		r.logger.Debug(
+			"[reader %p] fetched 0 of %d fact(s), entering starvation mode with poll rate of %.02f/s",
+			r,
+			limit,
+			durationToRate(delay),
+		)
+	} else if delay > r.pollInterval {
+		r.pollInterval = delay
+
+		r.logger.Debug(
+			"[reader %p] decreasing starvation mode poll rate to %.02f/s",
+			r,
+			durationToRate(delay),
+		)
+	}
+
+	r.emptyPolls++
 }
 
 // fetch queries the database for facts beginning at r.addr.
@@ -364,4 +415,9 @@ func (r *Reader) poll(limit int) (int, error) {
 	}
 
 	return count, nil
+}
+
+func durationToRate(d time.Duration) float64 {
+	seconds := float64(d) / float64(time.Second)
+	return 1.0 / seconds
 }
