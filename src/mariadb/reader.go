@@ -327,7 +327,6 @@ func (r *Reader) tick() error {
 
 // fetch queries the database for facts beginning at r.addr.
 func (r *Reader) poll(limit int) (int, error) {
-
 	rows, err := r.stmt.QueryContext(
 		r.ctx,
 		r.addr.Offset,
