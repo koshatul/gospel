@@ -75,7 +75,7 @@ func Open(dsn string, opts ...gospel.Option) (*Client, error) {
 
 	return &Client{
 		db,
-		rate.NewLimiter(60, 1), // TODO, allow configuration
+		rate.NewLimiter(500, 1), // TODO, allow configuration
 		o.Logger,
 	}, nil
 }

@@ -11,7 +11,6 @@ import (
 	"github.com/jmalloc/gospel/src/gospel"
 	"github.com/jmalloc/gospel/src/internal/driver"
 	"github.com/jmalloc/twelf/src/twelf"
-	"github.com/jpillora/backoff"
 	"golang.org/x/time/rate"
 )
 
@@ -20,15 +19,6 @@ type Reader struct {
 	// stmt is a prepared statement used to query for facts.
 	// It accepts two parameters, stream offset and limit.
 	stmt *sql.Stmt
-
-	// backoff is the exponential-backoff policy to be used in "starvation mode"
-	// which is entered when a poll query does not produce any facts.
-	backoff *backoff.Backoff
-
-	// limit is a rate-limiter that limits the number of polling queries that
-	// can be performed each second. It is shared by all readers, and hence
-	// provides a global cap of the number of read queries per second.
-	limit *rate.Limiter
 
 	// logger is the target for debug logging. readers do not perform activity
 	// logging.
@@ -70,15 +60,30 @@ type Reader struct {
 	// addr is the starting address for the next database poll.
 	addr gospel.Address
 
-	// emptyPolls keeps track of the number of database polls that have not
-	// returned any facts since the last poll that completely filled the
-	// lookahead buffer.
-	emptyPolls int
+	// globalLimit is a rate-limiter that limits the number of polling queries that
+	// can be performed each second. It is shared by all readers, and hence
+	// provides a global cap of the number of read queries per second.
+	globalLimit *rate.Limiter
 
-	// pollInterval is the time between database polls in "starvation mode".
-	// The reader is in starvation mode when emptyPolls != 0, otherwise it is
-	// in "catch-up" mode.
-	pollInterval time.Duration
+	// adaptiveLimit is a rate-limiter that is adjusted on-the-fly in an attempt
+	// to perform polling queries just often enough to keep the lookahead
+	// buffer full.
+	adaptiveLimit *rate.Limiter
+
+	// minAdaptiveLimit is the absolute minimum polling frequency, and therefore
+	// sets the maximum possible latency before a reader is delivered new facts.
+	minAdaptiveLimit rate.Limit
+
+	bias int
+
+	// prevPollEmpty is true if the previous database poll did not return any
+	// facts. It is only used to mute consecutive debug messages if there are no
+	// facts to report.
+	prevPollEmpty bool
+
+	prevFPS  time.Time
+	fps      float64
+	fpsCount int
 }
 
 // errReaderClosed is an error returned by Next() when it is called on a closed
@@ -99,22 +104,20 @@ func openReader(
 	// opening of the reader itself.
 	runCtx, cancel := context.WithCancel(context.Background())
 
-	// Create a read-buffer smaller than the lookahead amount so that
-	// the worker tends to block when queuing the last fact from each poll.
-	size := getLookahead(opts)
-	if size != 0 {
-		size--
-	}
+	lookahead := getLookahead(opts)
 
 	r := &Reader{
-		limit:  limit,
-		logger: logger,
-		opts:   opts,
-		facts:  make(chan gospel.Fact, size),
-		done:   make(chan error, 1),
-		ctx:    runCtx,
-		cancel: cancel,
-		addr:   addr,
+		logger:           logger,
+		opts:             opts,
+		facts:            make(chan gospel.Fact, lookahead),
+		done:             make(chan error, 1),
+		ctx:              runCtx,
+		cancel:           cancel,
+		addr:             addr,
+		globalLimit:      limit,
+		adaptiveLimit:    rate.NewLimiter(limit.Limit(), 1),
+		minAdaptiveLimit: rate.Every(3 * time.Second), // TODO: make into configuration option
+		prevFPS:          time.Now(),
 	}
 
 	if err := r.init(ctx, db, storeID); err != nil {
@@ -204,23 +207,9 @@ func (r *Reader) Close() error {
 	}
 }
 
-// init intialises the reader based on r.opts.
-func (r *Reader) init(ctx context.Context, db *sql.DB, storeID uint64) error {
-	if err := r.prepareStatement(ctx, db, storeID); err != nil {
-		return err
-	}
-
-	r.backoff = &backoff.Backoff{
-		Jitter: true,
-		Max:    3 * time.Second, // TODO: allow configuration via options
-	}
-
-	return nil
-}
-
-// prepareStatement creates r.stmt, an SQL prepared statement used to poll
+// init creates r.stmt, an SQL prepared statement used to poll
 // for new facts.
-func (r *Reader) prepareStatement(ctx context.Context, db *sql.DB, storeID uint64) error {
+func (r *Reader) init(ctx context.Context, db *sql.DB, storeID uint64) error {
 	filter := ""
 	if r.opts.FilterByEventType {
 		types := strings.Join(escapeStrings(r.opts.EventTypes), `, `)
@@ -271,11 +260,12 @@ func (r *Reader) run() {
 		}
 
 		r.logger.Debug(
-			"[reader %p] opened at %s (global poll limit: %.02f/s, starvation mode poll rate: %.02f/s, event-type filter: %s)",
+			"[reader %p] opened at %s, global poll limit: %.02f/s, min adaptive poll limit: %.02f/s, lookahead: %d, event-type filter: %s",
 			r,
 			r.addr,
-			float64(r.limit.Limit()),
-			durationToRate(r.backoff.Max),
+			float64(r.globalLimit.Limit()),
+			float64(r.minAdaptiveLimit),
+			getLookahead(r.opts),
 			filter,
 		)
 	}
@@ -293,87 +283,137 @@ func (r *Reader) run() {
 
 // tick executes one pass of the worker goroutine.
 func (r *Reader) tick() error {
-	if err := r.limit.Wait(r.ctx); err != nil {
+	if err := r.globalLimit.Wait(r.ctx); err != nil {
 		return err
 	}
 
-	limit := getLookahead(r.opts) - len(r.facts)
+	if err := r.adaptiveLimit.Wait(r.ctx); err != nil {
+		return err
+	}
+
+	limit := cap(r.facts) - len(r.facts) + 1
+	// if limit == 0 {
+	// 	limit = 1
+	// }
+	// limit := getLookahead(r.opts)
 
 	count, err := r.poll(limit)
 	if err != nil {
 		return err
 	}
 
-	if count == limit {
-		r.fullPoll(limit)
-	} else if count == 0 {
-		r.emptyPoll(limit)
+	r.fpsCount++
+
+	_, diff := r.adjustRate(count, limit)
+
+	if r.logger.IsDebug() {
+		if (count != 0 || !r.prevPollEmpty) || // only log first empty poll if nothing else changed
+			diff != 0 { // log poll rate changes
+
+			flag := ""
+			if count == 0 {
+				flag = "***************"
+			}
+
+			elapsed := time.Since(r.prevFPS)
+			if elapsed >= time.Second {
+				r.fps = float64(r.fpsCount) / elapsed.Seconds()
+				r.fpsCount = 0
+				r.prevFPS = time.Now()
+			}
+
+			message := fmt.Sprintf(
+				"[reader %p] next: %s, fetched: %d/%d, enqueued: %d/%d, adaptive poll rate: %.02f/s, actual poll rate: %.02f/s %s",
+				r,
+				r.addr,
+				count,
+				limit,
+				len(r.facts),
+				cap(r.facts),
+				r.adaptiveLimit.Limit(),
+				r.fps,
+				flag,
+			)
+
+			// if diff != 0 {
+			// 	polarity := "increased"
+			// 	if diff < 0 {
+			// 		polarity = "decreased"
+			// 	}
+			//
+			// 	message += fmt.Sprintf(
+			// 		", %s adaptive poll rate to %.02f/s",
+			// 		polarity,
+			// 		lim,
+			// 	)
+			// }
+
+			r.logger.DebugString(message)
+		}
+
+		// if count == 0 {
+		// 	r.prevPollEmpty = true
+		// }
+	}
+
+	return nil
+}
+
+// adjustRate updates the adaptive poll rate in an attempt to balance database
+// poll frequency with latency.
+func (r *Reader) adjustRate(count, limit int) (lim rate.Limit, diff rate.Limit) {
+	var delta int
+
+	if count < 1 {
+		delta = -1
+		if r.bias > 0 {
+			r.bias = 0
+		}
+	} else if count == limit {
+		delta = +count
+		if r.bias < 0 {
+			r.bias = 0
+		}
+	} else if count > 1 {
+		delta = +1
+		if r.bias < 0 {
+			r.bias = 0
+		}
 	} else {
-		r.shortPoll(count, limit)
+		return
 	}
 
-	if r.pollInterval == 0 {
-		return nil
-	}
+	bias := r.bias + delta
+	step := rate.Limit(0.01)
+	rateDelta := rate.Limit(bias) * step
 
-	select {
-	case <-time.After(r.pollInterval):
-		return nil
-	case <-r.ctx.Done():
-		return r.ctx.Err()
-	}
-}
-
-// fullPoll is called after a poll produces enough facts to fill the lookahead
-// buffer.
-func (r *Reader) fullPoll(limit int) {
-	message := "[reader %p] fetched %d of %d fact(s)"
-
-	if r.emptyPolls != 0 {
-		message += ", entering catch-up mode"
-	}
-
-	r.logger.Debug(message, r, limit, limit)
-
-	r.emptyPolls = 0
-	r.pollInterval = 0
-}
-
-// shortPoll is called after poll produces some facts, but not enough to fill
-// the lookahead buffer.
-func (r *Reader) shortPoll(count, limit int) {
-	r.logger.Debug(
-		"[reader %p] fetched %d of %d fact(s)",
-		r,
-		count,
-		limit,
+	lim, diff = r.setPollRate(
+		r.adaptiveLimit.Limit() + rateDelta,
 	)
-}
 
-// emptyPoll is called after a poll does not produce any facts.
-func (r *Reader) emptyPoll(limit int) {
-	delay := r.backoff.ForAttempt(float64(r.emptyPolls))
-
-	if r.emptyPolls == 0 {
-		r.pollInterval = delay
-
-		r.logger.Debug(
-			"[reader %p] fetched 0 of %d fact(s), entering starvation mode with poll rate of %.02f/s",
-			r,
-			limit,
-			durationToRate(delay),
-		)
-	} else if delay > r.pollInterval {
-		r.pollInterval = delay
-
-		r.logger.Debug(
-			"[reader %p] decreasing starvation mode poll rate to %.02f/s",
-			r,
-			durationToRate(delay),
-		)
+	if diff != 0 {
+		r.bias = bias
 	}
 
-	r.emptyPolls++
+	return
+}
+
+func (r *Reader) setPollRate(lim rate.Limit) (rate.Limit, rate.Limit) {
+	min := r.minAdaptiveLimit
+	max := r.globalLimit.Limit()
+
+	if lim < min {
+		lim = min
+	} else if lim > max {
+		lim = max
+	}
+
+	prev := r.adaptiveLimit.Limit()
+
+	if lim != prev {
+		r.adaptiveLimit.SetLimit(lim)
+	}
+	return lim, lim - prev
 }
 
 // fetch queries the database for facts beginning at r.addr.
@@ -415,9 +455,4 @@ func (r *Reader) poll(limit int) (int, error) {
 	}
 
 	return count, nil
-}
-
-func durationToRate(d time.Duration) float64 {
-	seconds := float64(d) / float64(time.Second)
-	return 1.0 / seconds
 }
