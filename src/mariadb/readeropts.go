@@ -6,7 +6,7 @@ type lookaheadOptionKey struct{}
 
 // DefaultLookahead is the lookahead hint.
 // See the Lookahead() reader option.
-const DefaultLookahead = 20
+const DefaultLookahead = 100
 
 // Lookahead is a reader option that specifies a hint as to how many facts
 // should be buffered before they are required by a call to Reader.Next().

@@ -71,9 +71,15 @@ FindOffset:
 			}
 
 			if rand.Intn(300) == 0 {
-				lim := rate.Limit(5 + rand.Intn(1995))
-				limiter.SetLimit(lim)
-				fmt.Printf("new rate is %0.02f/s\n", (lim))
+				if limiter.Limit() > 100 {
+					lim := rate.Limit(rand.Intn(10))
+					limiter.SetLimit(lim)
+					fmt.Printf("new rate is %0.02f/s\n", (lim))
+				} else {
+					lim := rate.Limit(rand.Intn(200))
+					limiter.SetLimit(lim)
+					fmt.Printf("new rate is %0.02f/s\n", (lim))
+				}
 			}
 
 			addr, err = es.Append(

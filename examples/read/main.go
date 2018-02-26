@@ -45,7 +45,8 @@ func main() {
 			log.Fatal(err)
 		}
 
-		time.Sleep(time.Duration(rand.Intn(20)) * time.Millisecond)
+		s := time.Duration(rand.Intn(5)) * time.Millisecond
+		time.Sleep(s)
 	}
 }
 
