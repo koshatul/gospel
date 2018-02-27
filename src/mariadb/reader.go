@@ -16,43 +16,48 @@ import (
 	"golang.org/x/time/rate"
 )
 
+const (
+	// averageLatencyAge is average age of samples to keep when computing the
+	// average latency. A sample is taken after each poll.
+	//
+	// Averages are computed using an exponentially-weighted moving average.
+	// See https://github.com/VividCortex/ewma for more information.
+	averageLatencyAge = 20.0
+)
+
 // Reader is an interface for reading facts from a stream stored in MariaDB.
 type Reader struct {
 	// stmt is a prepared statement used to query for facts.
-	// It accepts two parameters, stream offset and limit.
+	// It accepts the stream offset as a parameter.
 	stmt *sql.Stmt
 
-	// logger is the target for debug logging. readers do not perform activity
-	// logging.
+	// logger is the target for debug logging. Readers do not perform general
+	// activity logging.
 	logger twelf.Logger
-
-	// opts is the options specified when opening the reader.
-	opts *driver.ReaderOptions
 
 	// facts is a channel on which facts are delivered to the caller of Next().
 	// A worker goroutine polls the database and delivers the facts to this
 	// channel.
 	facts chan gospel.Fact
 
-	// current is the "current" fact which is returned by Get() until Next() is
-	// called again.
+	// current is the fact returned by Get() until Next() is called again.
 	current *gospel.Fact
 
-	// next is the "next" fact, after "current". It is read from the facts
-	// channel when a call to Next() to improve the accuracy of Next()'s 'nx'
-	// output parameter (rather than just returning r.current.Addr().Next()).
+	// next is the fact that will become "current" when Next() is called.
+	// If it is nil, no additional facts were available in the buffer on the
+	// previous call to Next().
 	next *gospel.Fact
 
-	// done is a signaling channel which is closed when the worker goroutine
-	// returns. The error that caused the closure, if any, is sent to the
-	// channel before it closed. This means a pending call to Next() will return
-	// the error when it first occurs, but subsequent calls will return a more
-	// generic "reader is closed" error.
+	// done is a signaling channel which is closed when the database polling
+	// goroutine returns. The error that caused the closure, if any, is sent to
+	// the channel before it closed. This means a pending call to Next() will
+	// return the error when it first occurs, but subsequent calls will return
+	// a more generic "reader is closed" error.
 	done chan error
 
 	// ctx is a context that is canceled when Close() is called, or when the
-	// worker goroutine returns. It is used to abort any in-progress database
-	// queries when the reader is closed.
+	// database polling goroutine returns. It is used to abort any in-progress
+	// database queries or rate-limit pauses when the reader is closed.
 	//
 	// Context cancellation errors are not sent to the 'done' channel, so any
 	// pending Next() call will receive a generic "reader is closed" error.
@@ -62,18 +67,19 @@ type Reader struct {
 	// addr is the starting address for the next database poll.
 	addr gospel.Address
 
-	// globalLimit is a rate-limiter that limits the number of polling queries that
-	// can be performed each second. It is shared by all readers, and hence
+	// globalLimit is a rate-limiter that limits the number of polling queries
+	// that can be performed each second. It is shared by all readers, and hence
 	// provides a global cap of the number of read queries per second.
 	globalLimit *rate.Limiter
 
 	// adaptiveLimit is a rate-limiter that is adjusted on-the-fly in an attempt
 	// to balance the number of database polls against the latency of facts.
+	// It is not shared by other readers.
 	adaptiveLimit *rate.Limiter
 
 	// acceptableLatency is the amount of latency that is generally acceptable
-	// for the purposes of this reader. The adaptive limiter will attempt to
-	// maintain this latency by increasing and decreasing the polling rate.
+	// for the purposes of this reader. The reader will attempt to maintain this
+	// latency by adjusting its polling rate.
 	//
 	// TODO: define a reader option to set acceptable latency.
 	acceptableLatency time.Duration
@@ -85,8 +91,8 @@ type Reader struct {
 	// TODO: define a reader option to set starvation latency.
 	starvationLatency time.Duration
 
-	// instantaneousLatency is the latency computed from the facts from the
-	// most recent database poll. If there are no facts found the latency is 0.
+	// instantaneousLatency is the latency computed from the facts returend by
+	// the most recent database poll. If there are no facts the latency is 0.
 	instantaneousLatency time.Duration
 
 	// averageLatency tracks the average latency of the last 10 database polls.
@@ -102,6 +108,9 @@ type Reader struct {
 // readerDebug contains several properties that are only relevant when the
 // reader is using a debug logger.
 type readerDebug struct {
+	// opts is the options specified when opening the reader.
+	opts *driver.ReaderOptions
+
 	// averagePollRate keeps track of the average polling rate, which can be
 	// substantially lower than the adaptive limit for slow readers.
 	averagePollRate *metrics.RateCounter
@@ -142,8 +151,7 @@ func openReader(
 
 	r := &Reader{
 		logger:      logger,
-		opts:        opts,
-		facts:       make(chan gospel.Fact, getLookahead(opts)),
+		facts:       make(chan gospel.Fact, getReadBufferSize(opts)),
 		done:        make(chan error, 1),
 		ctx:         runCtx,
 		cancel:      cancel,
@@ -153,17 +161,18 @@ func openReader(
 		adaptiveLimit:     rate.NewLimiter(rate.Every(accetableLatency), 1),
 		acceptableLatency: accetableLatency,
 		starvationLatency: starvationLatency,
-		averageLatency:    ewma.NewMovingAverage(20),
+		averageLatency:    ewma.NewMovingAverage(averageLatencyAge),
 	}
 
 	if logger.IsDebug() {
 		r.debug = &readerDebug{
+			opts:            opts,
 			averagePollRate: metrics.NewRateCounter(),
 			averageFactRate: metrics.NewRateCounter(),
 		}
 	}
 
-	if err := r.prepareStatement(ctx, db, storeID); err != nil {
+	if err := r.prepareStatement(ctx, db, storeID, opts); err != nil {
 		return nil, err
 	}
 
@@ -241,10 +250,15 @@ func (r *Reader) Close() error {
 
 // prepareStatement creates r.stmt, an SQL prepared statement used to poll
 // for new facts.
-func (r *Reader) prepareStatement(ctx context.Context, db *sql.DB, storeID uint64) error {
+func (r *Reader) prepareStatement(
+	ctx context.Context,
+	db *sql.DB,
+	storeID uint64,
+	opts *driver.ReaderOptions,
+) error {
 	filter := ""
-	if r.opts.FilterByEventType {
-		types := strings.Join(escapeStrings(r.opts.EventTypes), `, `)
+	if opts.FilterByEventType {
+		types := strings.Join(escapeStrings(opts.EventTypes), `, `)
 		filter = `AND e.event_type IN (` + types + `)`
 	}
 
@@ -450,18 +464,18 @@ func (r *Reader) logInitialization() {
 	}
 
 	filter := "*"
-	if r.opts.FilterByEventType {
-		filter = strings.Join(r.opts.EventTypes, ", ")
+	if r.debug.opts.FilterByEventType {
+		filter = strings.Join(r.debug.opts.EventTypes, ", ")
 	}
 
 	r.logger.Debug(
-		"[reader %p] %s | global poll limit: %s | acceptable latency: %s | starvation latency: %s | look-ahead: %d | filter: %s",
+		"[reader %p] %s | global poll limit: %s | acceptable latency: %s | starvation latency: %s | read-buffer: %d | filter: %s",
 		r,
 		r.addr,
 		formatRate(r.globalLimit.Limit()),
 		formatDuration(r.acceptableLatency),
 		formatDuration(r.starvationLatency),
-		getLookahead(r.opts),
+		cap(r.facts),
 		filter,
 	)
 }

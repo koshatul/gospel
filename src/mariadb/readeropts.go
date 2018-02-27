@@ -2,31 +2,32 @@ package mariadb
 
 import "github.com/jmalloc/gospel/src/internal/driver"
 
-type lookaheadOptionKey struct{}
+// readerOptionKey is a custom string used to ensure that MariaDB-specific keys
+// can not clash with custom options from other systems.
+type readerOptionKey string
 
-// DefaultLookahead is the lookahead hint.
-// See the Lookahead() reader option.
-const DefaultLookahead = 100
+const readBufferKey readerOptionKey = "read-buffer"
 
-// Lookahead is a reader option that specifies a hint as to how many facts
-// should be buffered before they are required by a call to Reader.Next().
-//
-// A higher lookahead will reduce read latency at the expensse of memory.
-func Lookahead(n int) driver.ReaderOption {
+// DefaultReadBuffer is the default read-buffer size used if no reader-specific
+// value is set via ReadBufferSize().
+const DefaultReadBuffer = 100
+
+// ReadBufferSize is a reader option that sets the number of facts to buffer
+// in memory before a call to Next().
+func ReadBufferSize(n int) driver.ReaderOption {
 	if n < 0 {
-		panic("lookahead can not be negative")
+		panic("read buffer size can not be negative")
 	}
 
 	return func(o *driver.ReaderOptions) {
-		o.Set(lookaheadOptionKey{}, n)
+		o.Set(readBufferKey, n)
 	}
 }
 
-// getLookahead returns the lookahead to use given the options o, falling back
-// to the default if necessary.
-func getLookahead(o *driver.ReaderOptions) int {
-	v, ok := o.Get(lookaheadOptionKey{})
-	if ok {
+// getReadBufferSize returns the read-buffer size to use given the options o,
+// falling back to the default if necessary.
+func getReadBufferSize(o *driver.ReaderOptions) int {
+	if v, ok := o.Get(readBufferKey); ok {
 		n := v.(int)
 
 		// lookahead at least until the 'next' fact.
@@ -37,5 +38,5 @@ func getLookahead(o *driver.ReaderOptions) int {
 		return n
 	}
 
-	return DefaultLookahead
+	return DefaultReadBuffer
 }
