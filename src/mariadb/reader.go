@@ -94,16 +94,24 @@ type Reader struct {
 	// starvationLatency values to decide how the poll rate is adjusted.
 	averageLatency ewma.MovingAverage
 
-	//
-	// Logging and debug state.
-	//
+	// debug contains several properties that are only relevant when the reader
+	// is using a debug logger.
+	debug *readerDebug
+}
 
+// readerDebug contains several properties that are only relevant when the
+// reader is using a debug logger.
+type readerDebug struct {
 	// averagePollRate keeps track of the average polling rate, which can be
 	// substantially lower than the adaptive limit for slow readers.
 	averagePollRate *metrics.RateCounter
 
 	// averageFactRate keeps track of the average rate of delivery of facts.
 	averageFactRate *metrics.RateCounter
+
+	// previousPollRate is compared to the poll rate after each poll to
+	// determine whether a log message should be displayed.
+	previousPollRate rate.Limit
 
 	// muteEmptyPolls is true if the previous database poll did not return any
 	// facts. It is only used to mute repeated debug messages if there is no new
@@ -149,8 +157,10 @@ func openReader(
 	}
 
 	if logger.IsDebug() {
-		r.averagePollRate = metrics.NewRateCounter()
-		r.averageFactRate = metrics.NewRateCounter()
+		r.debug = &readerDebug{
+			averagePollRate: metrics.NewRateCounter(),
+			averageFactRate: metrics.NewRateCounter(),
+		}
 	}
 
 	if err := r.init(ctx, db, storeID); err != nil {
@@ -252,10 +262,11 @@ func (r *Reader) init(ctx context.Context, db *sql.DB, storeID uint64) error {
 			AND f.stream = %s
 			AND f.offset >= ?
 		ORDER BY offset
-		LIMIT ?`,
+		LIMIT %d`,
 		filter,
 		storeID,
 		escapeString(r.addr.Stream),
+		cap(r.facts),
 	)
 
 	stmt, err := db.PrepareContext(ctx, query)
@@ -264,6 +275,9 @@ func (r *Reader) init(ctx context.Context, db *sql.DB, storeID uint64) error {
 	}
 
 	r.stmt = stmt
+
+	r.logInitialization()
+
 	return nil
 }
 
@@ -273,24 +287,6 @@ func (r *Reader) run() {
 	defer r.cancel()
 	defer close(r.done)
 	defer r.stmt.Close()
-
-	if r.logger.IsDebug() {
-		filter := "*"
-		if r.opts.FilterByEventType {
-			filter = strings.Join(r.opts.EventTypes, ", ")
-		}
-
-		r.logger.Debug(
-			"[reader %p] %s | global poll limit: %s | acceptable latency: %s | starvation latency: %s | look-ahead: %d | filter: %s",
-			r,
-			r.addr,
-			formatRate(r.globalLimit.Limit()),
-			formatDuration(r.acceptableLatency),
-			formatDuration(r.starvationLatency),
-			getLookahead(r.opts),
-			filter,
-		)
-	}
 
 	var err error
 
@@ -313,49 +309,22 @@ func (r *Reader) tick() error {
 		return err
 	}
 
-	queued := len(r.facts)
-	limit := cap(r.facts)
-
-	count, err := r.poll(limit)
+	count, err := r.poll()
 	if err != nil {
 		return err
 	}
 
-	r.averageLatency.Add(r.instantaneousLatency.Seconds())
-
-	changed := r.adjustRate(count, limit)
-
-	if r.logger.IsDebug() {
-		r.averagePollRate.Tick()
-
-		if changed || count != 0 || !r.muteEmptyPolls {
-			r.logger.Debug(
-				"[reader %p] %s | fetch: %3d/%3d %s | queue: %3d/%3d | adaptive poll: %s | avg poll: %s | latency: %s",
-				r,
-				r.addr,
-				count,
-				limit,
-				formatRate(rate.Limit(r.averageFactRate.Rate())),
-				queued,
-				cap(r.facts),
-				formatRate(r.adaptiveLimit.Limit()),
-				formatRate(rate.Limit(r.averagePollRate.Rate())),
-				formatDuration(r.effectiveLatency()),
-			)
-		}
-
-		// r.muteEmptyPolls = count == 0
-	}
+	r.adjustRate()
+	r.logPoll(count)
 
 	return nil
 }
 
 // fetch queries the database for facts beginning at r.addr.
-func (r *Reader) poll(limit int) (int, error) {
+func (r *Reader) poll() (int, error) {
 	rows, err := r.stmt.QueryContext(
 		r.ctx,
 		r.addr.Offset,
-		limit,
 	)
 	if err != nil {
 		return 0, err
@@ -398,12 +367,14 @@ func (r *Reader) poll(limit int) (int, error) {
 
 		count++
 
-		if r.averageFactRate != nil {
-			r.averageFactRate.Tick()
+		if r.debug != nil {
+			r.debug.averageFactRate.Tick()
 		}
 	}
 
+	// TODO: this doesn't account for the time spent waiting to write to r.facts.
 	r.instantaneousLatency = now.Sub(first)
+	r.averageLatency.Add(r.instantaneousLatency.Seconds())
 
 	return count, nil
 }
@@ -432,7 +403,7 @@ func (r *Reader) setRate(lim rate.Limit) bool {
 
 // adjustRate updates the adaptive poll rate in an attempt to balance database
 // poll frequency with latency.
-func (r *Reader) adjustRate(count, limit int) bool {
+func (r *Reader) adjustRate() bool {
 	latency := r.effectiveLatency()
 
 	// headroom is the difference between the acceptable latency and the
@@ -446,7 +417,7 @@ func (r *Reader) adjustRate(count, limit int) bool {
 	// }
 
 	// Get the current rate in terms of an interval.
-	currentInterval := rateToInterval(
+	currentInterval := metrics.RateToDuration(
 		r.adaptiveLimit.Limit(),
 	)
 
@@ -472,28 +443,80 @@ func (r *Reader) effectiveLatency() time.Duration {
 	)
 }
 
-// rateToInterval converts a rate limit to the its interval.
-func rateToInterval(r rate.Limit) time.Duration {
-	return time.Duration(
-		(1.0 / r) * rate.Limit(time.Second),
+// logInitialization logs a debug message describing the reader settings.
+func (r *Reader) logInitialization() {
+	if !r.logger.IsDebug() {
+		return
+	}
+
+	filter := "*"
+	if r.opts.FilterByEventType {
+		filter = strings.Join(r.opts.EventTypes, ", ")
+	}
+
+	r.logger.Debug(
+		"[reader %p] %s | global poll limit: %s | acceptable latency: %s | starvation latency: %s | look-ahead: %d | filter: %s",
+		r,
+		r.addr,
+		formatRate(r.globalLimit.Limit()),
+		formatDuration(r.acceptableLatency),
+		formatDuration(r.starvationLatency),
+		getLookahead(r.opts),
+		filter,
 	)
 }
 
-// formatRate formats a rate limit as a human-readable string.
+// logPoll logs a debug message containing metrics for the previous poll and
+// adjustments to the adaptive poll rate.
+func (r *Reader) logPoll(count int) {
+	if r.debug == nil {
+		return
+	}
+
+	r.debug.averagePollRate.Tick()
+
+	pollRate := r.adaptiveLimit.Limit()
+
+	if pollRate == r.debug.previousPollRate &&
+		count == 0 && r.debug.muteEmptyPolls {
+		return
+	}
+
+	r.debug.muteEmptyPolls = count == 0
+
+	r.logger.Debug(
+		"[reader %p] %s | fetch: %3d %s | queue: %3d/%3d | adaptive poll: %s | avg poll: %s | latency: %s",
+		r,
+		r.addr,
+		count,
+		formatRate(rate.Limit(r.debug.averageFactRate.Rate())),
+		len(r.facts),
+		cap(r.facts),
+		formatRate(r.adaptiveLimit.Limit()),
+		formatRate(rate.Limit(r.debug.averagePollRate.Rate())),
+		formatDuration(r.effectiveLatency()),
+	)
+
+	r.debug.previousPollRate = pollRate
+}
+
+// formatRate formats a rate limit for display in reader debug logs.
 func formatRate(r rate.Limit) string {
 	if r == 0 {
 		//     "500.00/s   2.00ms"
 		return "  ?.??/s   ?.??µs"
 	}
 
+	d := metrics.RateToDuration(r)
+
 	return fmt.Sprintf(
 		"%6.02f/s %s",
 		r,
-		formatDuration(rateToInterval(r)),
+		formatDuration(d),
 	)
 }
 
-// formatDuration formats a duration as a human-readable string.
+// formatDuration formats a duration for display in reader debug logs.
 func formatDuration(d time.Duration) string {
 	if d >= time.Hour {
 		return fmt.Sprintf("%6.02fh ", d.Seconds()/3600)
