@@ -163,9 +163,11 @@ func openReader(
 		}
 	}
 
-	if err := r.init(ctx, db, storeID); err != nil {
+	if err := r.prepareStatement(ctx, db, storeID); err != nil {
 		return nil, err
 	}
+
+	r.logInitialization()
 
 	go r.run()
 
@@ -237,9 +239,9 @@ func (r *Reader) Close() error {
 	}
 }
 
-// init creates r.stmt, an SQL prepared statement used to poll
+// prepareStatement creates r.stmt, an SQL prepared statement used to poll
 // for new facts.
-func (r *Reader) init(ctx context.Context, db *sql.DB, storeID uint64) error {
+func (r *Reader) prepareStatement(ctx context.Context, db *sql.DB, storeID uint64) error {
 	filter := ""
 	if r.opts.FilterByEventType {
 		types := strings.Join(escapeStrings(r.opts.EventTypes), `, `)
@@ -275,8 +277,6 @@ func (r *Reader) init(ctx context.Context, db *sql.DB, storeID uint64) error {
 	}
 
 	r.stmt = stmt
-
-	r.logInitialization()
 
 	return nil
 }
