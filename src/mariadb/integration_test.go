@@ -9,12 +9,21 @@ import (
 	"time"
 
 	"github.com/go-sql-driver/mysql"
+	"github.com/jmalloc/gospel/src/gospel"
 	"github.com/jmalloc/gospel/src/mariadb"
+	"github.com/jmalloc/twelf/src/twelf"
 )
 
 // getTestClient returns a Client that uses the test DSN.
 func getTestClient() *mariadb.Client {
-	c, err := mariadb.OpenEnv()
+	c, err := mariadb.OpenEnv(
+		gospel.Logger(
+			&twelf.StandardLogger{
+				CaptureDebug: true,
+			},
+		),
+	)
+
 	if err != nil {
 		panic(err)
 	}
