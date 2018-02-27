@@ -1,13 +1,13 @@
 // +build !without_mariadb
 
-package mariadb_test
+package gospelmaria_test
 
 import (
 	"context"
 	"time"
 
 	"github.com/jmalloc/gospel/src/gospel"
-	. "github.com/jmalloc/gospel/src/mariadb"
+	. "github.com/jmalloc/gospel/src/gospelmaria"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

@@ -2,58 +2,62 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
-	"math/rand"
-	"strconv"
-	"time"
+	"os"
 
+	"github.com/jmalloc/gospel/examples"
 	"github.com/jmalloc/gospel/src/gospel"
-	"github.com/jmalloc/gospel/src/mariadb"
-	"github.com/jmalloc/twelf/src/twelf"
+	"github.com/jmalloc/gospel/src/gospelmaria"
 )
 
+// This example shows how to use EventStore.AppendUnchecked() to append events
+// without using optimistic concurrency control.
+//
+// The example also mimics load spikes using a rate limiter with a randomized
+// limit.
+
 func main() {
-	c, err := mariadb.OpenEnv(
-		gospel.Logger(
-			&twelf.StandardLogger{
-				CaptureDebug: true,
-			},
-		),
-	)
+	// Open a connection to MariaDB using the GOSPEL_MARIADB_DSN environment
+	// variable for the DSN.
+	c, err := gospelmaria.OpenEnv()
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer c.Close()
 
-	ctx := context.Background()
+	// Create a context and cancel it if we receive an interrupt (CTRL-C) signal.
+	ctx, cancel := examples.WithCancelOnInterrupt(context.Background())
+	defer cancel()
 
-	es, err := c.OpenStore(ctx, "example")
+	// Open the "example-store" event store. All of the examples in this
+	// directory use the same store and stream so that they can be used together.
+	es, err := c.OpenStore(ctx, "example-store")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	var counter uint64
+
 	for {
+		examples.RateLimit(ctx)
+
 		_, err := es.AppendUnchecked(
 			ctx,
-			"my-stream",
+			"example-stream",
 			gospel.Event{
-				EventType: "example-event",
-				Body:      []byte(strconv.FormatUint(counter, 10)),
+				EventType:   "append-unchecked-example",
+				ContentType: "text/plain",
+				Body: []byte(fmt.Sprintf(
+					"pid %d, event #%d",
+					os.Getpid(),
+					counter,
+				)),
 			},
 		)
 		if err != nil {
 			log.Fatal(err)
 		}
-
 		counter++
-
-		if rand.Intn(2) != 0 {
-			time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
-		}
 	}
-}
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
 }

@@ -3,91 +3,86 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"math/rand"
-	"strconv"
-	"time"
+	"os"
 
+	"github.com/jmalloc/gospel/examples"
 	"github.com/jmalloc/gospel/src/gospel"
-	"github.com/jmalloc/gospel/src/mariadb"
-	"github.com/jmalloc/twelf/src/twelf"
-	"golang.org/x/time/rate"
+	"github.com/jmalloc/gospel/src/gospelmaria"
 )
 
+// This example shows how to use EventStore.Append() to append events using
+// optimistic concurrency control.
+//
+// It first performs an "unchecked append" (EventStore.AppendUchecked()) to
+// append to the end of the stream and discover the offset, then repeatedly
+// appends events at what it thinks is the next unused offset.
+//
+// If a conflict is encountered (that is, some other process wrote to the
+// stream), it starts the entire process again. Run the example in multiple
+// processes to see conflicts occur.
+//
+// The example also mimics load spikes using a rate limiter with a randomized
+// limit.
+
 func main() {
-	c, err := mariadb.OpenEnv(
-		gospel.Logger(
-			&twelf.StandardLogger{
-				Target: log.New(ioutil.Discard, "", 0),
-				// CaptureDebug: true,
-			},
-		),
-	)
+	// Open a connection to MariaDB using the GOSPEL_MARIADB_DSN environment
+	// variable for the DSN.
+	c, err := gospelmaria.OpenEnv()
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer c.Close()
 
-	ctx := context.Background()
+	// Create a context and cancel it if we receive an interrupt (CTRL-C) signal.
+	ctx, cancel := examples.WithCancelOnInterrupt(context.Background())
+	defer cancel()
 
-	es, err := c.OpenStore(ctx, "example")
+	// Open the "example-store" event store. All of the examples in this
+	// directory use the same store and stream so that they can be used together.
+	es, err := c.OpenStore(ctx, "example-store")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	var counter uint64
-	limiter := rate.NewLimiter(
-		rate.Limit(90),
-		// rate.Inf,
-		1,
-	)
-
-	lim := rate.Limit(5 + rand.Intn(95))
-	limiter.SetLimit(lim)
-	fmt.Printf("new rate is %0.02f/s\n", lim)
 
 FindOffset:
 	for {
-		// Use AppendUnchecked once just to find the next offset of the stream.
-		addr, err := es.AppendUnchecked(
+		// Use AppendUnchecked() once just to find the next offset of the stream.
+		next, err := es.AppendUnchecked(
 			ctx,
-			"my-stream",
+			"example-stream",
 			gospel.Event{
-				EventType: "example-event",
-				Body:      []byte(strconv.FormatUint(counter, 10)),
+				EventType:   "append-example",
+				ContentType: "text/plain",
+				Body: []byte(fmt.Sprintf(
+					"pid %d, event #%d",
+					os.Getpid(),
+					counter,
+				)),
 			},
 		)
 		if err != nil {
 			log.Fatal(err)
 		}
+		counter++
 
-		// Then proceed to use a checked append.
+		// Then repeatedly append with optimistic concurrency control via Append().
 		for {
-			counter++
+			examples.RateLimit(ctx)
 
-			if err = limiter.Wait(ctx); err != nil {
-				log.Fatal(err)
-			}
-
-			if rand.Intn(300) == 0 {
-				if limiter.Limit() > 100 {
-					lim := rate.Limit(rand.Intn(10))
-					limiter.SetLimit(lim)
-					fmt.Printf("new rate is %0.02f/s\n", (lim))
-				} else {
-					lim := rate.Limit(rand.Intn(200))
-					limiter.SetLimit(lim)
-					fmt.Printf("new rate is %0.02f/s\n", (lim))
-				}
-			}
-
-			addr, err = es.Append(
+			next, err = es.Append(
 				ctx,
-				addr,
+				next,
 				gospel.Event{
-					EventType: "example-event",
-					Body:      []byte(strconv.FormatUint(counter, 10)),
+					EventType:   "append-example",
+					ContentType: "text/plain",
+					Body: []byte(fmt.Sprintf(
+						"pid %d, event #%d",
+						os.Getpid(),
+						counter,
+					)),
 				},
 			)
 
@@ -96,10 +91,8 @@ FindOffset:
 			} else if err != nil {
 				log.Fatal(err)
 			}
+
+			counter++
 		}
 	}
-}
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
 }

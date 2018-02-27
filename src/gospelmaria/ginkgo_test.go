@@ -1,4 +1,4 @@
-package mariadb_test
+package gospelmaria_test
 
 import (
 	"reflect"

@@ -1,6 +1,6 @@
 // +build !without_mariadb,!without_examples
 
-package mariadb_test
+package gospelmaria_test
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/jmalloc/gospel/src/gospel"
-	"github.com/jmalloc/gospel/src/mariadb"
+	"github.com/jmalloc/gospel/src/gospelmaria"
 )
 
 // This example illustrates how to append and read events to/from an event store.
@@ -21,7 +21,7 @@ func Example_appendAndRead() {
 	defer cancel()
 
 	// Open a MariaDB client.
-	c, err := mariadb.OpenEnv()
+	c, err := gospelmaria.OpenEnv()
 	if err != nil {
 		panic(err)
 	}
@@ -41,7 +41,7 @@ func Example_appendAndRead() {
 	_, err = es.Append(
 		ctx,
 		gospel.Address{
-			Stream: "my-stream",
+			Stream: "append-and-read-example",
 			Offset: 0,
 		},
 		gospel.Event{EventType: "event-1"},
@@ -52,9 +52,10 @@ func Example_appendAndRead() {
 		panic(err)
 	}
 
-	// Open a new reader that starts reading from the beginning of "my-stream".
+	// Open a new reader that starts reading from the beginning of
+	// the "append-and-read-example" stream.
 	r, err := es.Open(ctx, gospel.Address{
-		Stream: "my-stream",
+		Stream: "append-and-read-example",
 		Offset: 0,
 	})
 	if err != nil {

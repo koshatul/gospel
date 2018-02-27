@@ -1,4 +1,4 @@
-package mariadb
+package gospelmaria
 
 import (
 	"github.com/go-sql-driver/mysql"

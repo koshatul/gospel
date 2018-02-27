@@ -1,6 +1,6 @@
 // +build !without_mariadb
 
-package mariadb_test
+package gospelmaria_test
 
 import (
 	"context"
@@ -10,13 +10,13 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/jmalloc/gospel/src/gospel"
-	"github.com/jmalloc/gospel/src/mariadb"
+	"github.com/jmalloc/gospel/src/gospelmaria"
 	"github.com/jmalloc/twelf/src/twelf"
 )
 
 // getTestClient returns a Client that uses the test DSN.
-func getTestClient() *mariadb.Client {
-	c, err := mariadb.OpenEnv(
+func getTestClient() *gospelmaria.Client {
+	c, err := gospelmaria.OpenEnv(
 		gospel.Logger(
 			&twelf.StandardLogger{
 				CaptureDebug: true,
@@ -32,7 +32,7 @@ func getTestClient() *mariadb.Client {
 }
 
 // getTestStore returns an EventStore that uses the test DSN.
-func getTestStore() (*mariadb.Client, *mariadb.EventStore) {
+func getTestStore() (*gospelmaria.Client, *gospelmaria.EventStore) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
