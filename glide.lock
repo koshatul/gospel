@@ -1,5 +1,5 @@
-hash: 8d49e50fcf3a1a79ccd6a5dc4631e1d441b4a7435cc457ce6bc05491a8e7d426
-updated: 2018-02-25T08:43:58.225206+10:00
+hash: 9611c013dd6bcdd1ec2f0102c642801383c0f0cbc0139e8de2319e117af4b575
+updated: 2018-02-27T20:58:14.89026+10:00
 imports:
 - name: github.com/go-sql-driver/mysql
   version: bc14601d1bd56421dd60f561e6052c9ed77f9daf
@@ -7,10 +7,10 @@ imports:
   version: ffe2c64ef8c5e93b1410e818808fe4fddfb5e02d
   subpackages:
   - src/twelf
-- name: github.com/jpillora/backoff
-  version: 8eab2debe79d12b7bd3d10653910df25fa9552ba
 - name: github.com/uber-go/multierr
   version: 3c4937480c32f4c13a875a1829af76c98ca3d40a
+- name: github.com/VividCortex/ewma
+  version: b24eb346a94c3ba12c1da1e564dbac1b498a77ce
 - name: go.uber.org/atomic
   version: 8474b86a5a6f79c443ce4b2992817ff32cf208b8
 - name: golang.org/x/net

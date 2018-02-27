@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"strconv"
@@ -11,13 +12,15 @@ import (
 	"github.com/jmalloc/gospel/src/gospel"
 	"github.com/jmalloc/gospel/src/mariadb"
 	"github.com/jmalloc/twelf/src/twelf"
+	"golang.org/x/time/rate"
 )
 
 func main() {
 	c, err := mariadb.OpenEnv(
 		gospel.Logger(
 			&twelf.StandardLogger{
-				CaptureDebug: true,
+				Target: log.New(ioutil.Discard, "", 0),
+				// CaptureDebug: true,
 			},
 		),
 	)
@@ -34,6 +37,15 @@ func main() {
 	}
 
 	var counter uint64
+	limiter := rate.NewLimiter(
+		rate.Limit(90),
+		// rate.Inf,
+		1,
+	)
+
+	lim := rate.Limit(5 + rand.Intn(95))
+	limiter.SetLimit(lim)
+	fmt.Printf("new rate is %0.02f/s\n", lim)
 
 FindOffset:
 	for {
@@ -54,10 +66,20 @@ FindOffset:
 		for {
 			counter++
 
-			if rand.Intn(10) == 0 {
-				d := time.Duration(rand.Intn(60)) * time.Second
-				fmt.Println("SLEEP", d)
-				time.Sleep(d)
+			if err = limiter.Wait(ctx); err != nil {
+				log.Fatal(err)
+			}
+
+			if rand.Intn(300) == 0 {
+				if limiter.Limit() > 100 {
+					lim := rate.Limit(rand.Intn(10))
+					limiter.SetLimit(lim)
+					fmt.Printf("new rate is %0.02f/s\n", (lim))
+				} else {
+					lim := rate.Limit(rand.Intn(200))
+					limiter.SetLimit(lim)
+					fmt.Printf("new rate is %0.02f/s\n", (lim))
+				}
 			}
 
 			addr, err = es.Append(

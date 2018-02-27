@@ -45,9 +45,8 @@ func main() {
 			log.Fatal(err)
 		}
 
-		if rand.Intn(2) != 0 {
-			time.Sleep(time.Duration(rand.Intn(500)) * time.Millisecond)
-		}
+		s := time.Duration(rand.Intn(10)) * time.Millisecond
+		time.Sleep(s)
 	}
 }
 
