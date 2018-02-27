@@ -281,7 +281,7 @@ func (r *Reader) run() {
 		}
 
 		r.logger.Debug(
-			"[reader %p] %s | global poll limit: %s | acceptable latency: %s, starvation: %s | look-ahead: %d | filter: %s",
+			"[reader %p] %s | global poll limit: %s | acceptable latency: %s | starvation latency: %s | look-ahead: %d | filter: %s",
 			r,
 			r.addr,
 			formatRate(r.globalLimit.Limit()),
@@ -330,7 +330,7 @@ func (r *Reader) tick() error {
 
 		if changed || count != 0 || !r.muteEmptyPolls {
 			r.logger.Debug(
-				"[reader %p] %s | fetch: %3d/%3d %s | queue: %3d/%3d | adaptive: %s, avg: %s | latency: %s",
+				"[reader %p] %s | fetch: %3d/%3d %s | queue: %3d/%3d | adaptive poll: %s | avg poll: %s | latency: %s",
 				r,
 				r.addr,
 				count,
@@ -495,13 +495,13 @@ func formatRate(r rate.Limit) string {
 
 // formatDuration formats a duration as a human-readable string.
 func formatDuration(d time.Duration) string {
-	if d > time.Hour {
+	if d >= time.Hour {
 		return fmt.Sprintf("%6.02fh ", d.Seconds()/3600)
-	} else if d > time.Minute {
+	} else if d >= time.Minute {
 		return fmt.Sprintf("%6.02fm ", d.Seconds()/60)
-	} else if d > time.Second {
+	} else if d >= time.Second {
 		return fmt.Sprintf("%6.02fs ", d.Seconds())
-	} else if d > time.Millisecond {
+	} else if d >= time.Millisecond {
 		return fmt.Sprintf("%6.02fms", d.Seconds()/time.Millisecond.Seconds())
 	}
 
