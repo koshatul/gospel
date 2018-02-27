@@ -80,8 +80,6 @@ type Reader struct {
 	// acceptableLatency is the amount of latency that is generally acceptable
 	// for the purposes of this reader. The reader will attempt to maintain this
 	// latency by adjusting its polling rate.
-	//
-	// TODO: define a reader option to set acceptable latency.
 	acceptableLatency time.Duration
 
 	// starvationLatency is the amount of latency that is acceptable when the
@@ -146,12 +144,12 @@ func openReader(
 	// opening of the reader itself.
 	runCtx, cancel := context.WithCancel(context.Background())
 
-	accetableLatency := 200 * time.Millisecond // TODO: option
-	starvationLatency := 3 * time.Second       // TODO: option
+	accetableLatency := getAcceptableLatency(opts)
+	starvationLatency := 3 * time.Second // TODO: option
 
 	r := &Reader{
 		logger:            logger,
-		facts:             make(chan gospel.Fact, GetReadBufferSize(opts)),
+		facts:             make(chan gospel.Fact, getReadBufferSize(opts)),
 		done:              make(chan error, 1),
 		ctx:               runCtx,
 		cancel:            cancel,
@@ -474,7 +472,7 @@ func (r *Reader) logInitialization() {
 		formatRate(r.globalLimit.Limit()),
 		formatDuration(r.acceptableLatency),
 		formatDuration(r.starvationLatency),
-		GetReadBufferSize(r.debug.opts),
+		getReadBufferSize(r.debug.opts),
 		filter,
 	)
 }
