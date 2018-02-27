@@ -15,6 +15,14 @@ var _ = Describe("ReadBufferSize", func() {
 
 		Expect(GetReadBufferSize(opts)).To(BeNumerically("==", 10))
 	})
+
+	It("caps the minimum size at 2", func() {
+		opts := &driver.ReaderOptions{}
+
+		ReadBufferSize(1)(opts)
+
+		Expect(GetReadBufferSize(opts)).To(BeNumerically("==", 2))
+	})
 })
 
 var _ = Describe("GetReadBufferSize", func() {

@@ -18,7 +18,13 @@ const (
 
 // ReadBufferSize is a reader option that sets the number of facts to buffer
 // in memory before a call to Next().
+//
+// The minimum read-buffer size is 2.
 func ReadBufferSize(n uint) driver.ReaderOption {
+	if n < 2 {
+		n = 2
+	}
+
 	return func(o *driver.ReaderOptions) {
 		o.Set(readBufferKey, n)
 	}

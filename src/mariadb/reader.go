@@ -150,14 +150,13 @@ func openReader(
 	starvationLatency := 3 * time.Second       // TODO: option
 
 	r := &Reader{
-		logger:      logger,
-		facts:       make(chan gospel.Fact, GetReadBufferSize(opts)),
-		done:        make(chan error, 1),
-		ctx:         runCtx,
-		cancel:      cancel,
-		addr:        addr,
-		globalLimit: limit,
-		// adaptiveLimit:     rate.NewLimiter(limit.Limit(), 1),
+		logger:            logger,
+		facts:             make(chan gospel.Fact, GetReadBufferSize(opts)),
+		done:              make(chan error, 1),
+		ctx:               runCtx,
+		cancel:            cancel,
+		addr:              addr,
+		globalLimit:       limit,
 		adaptiveLimit:     rate.NewLimiter(rate.Every(accetableLatency), 1),
 		acceptableLatency: accetableLatency,
 		starvationLatency: starvationLatency,
@@ -262,11 +261,6 @@ func (r *Reader) prepareStatement(
 		filter = `AND e.event_type IN (` + types + `)`
 	}
 
-	limit := GetReadBufferSize(opts)
-	if limit == 0 {
-		limit = 1
-	}
-
 	query := fmt.Sprintf(
 		`SELECT
 			f.offset,
@@ -287,7 +281,7 @@ func (r *Reader) prepareStatement(
 		filter,
 		storeID,
 		escapeString(r.addr.Stream),
-		limit,
+		cap(r.facts),
 	)
 
 	stmt, err := db.PrepareContext(ctx, query)
@@ -480,7 +474,7 @@ func (r *Reader) logInitialization() {
 		formatRate(r.globalLimit.Limit()),
 		formatDuration(r.acceptableLatency),
 		formatDuration(r.starvationLatency),
-		cap(r.facts),
+		GetReadBufferSize(r.debug.opts),
 		filter,
 	)
 }
