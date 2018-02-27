@@ -27,7 +27,7 @@ var _ = Describe("Reader", func() {
 
 	BeforeEach(func() {
 		var fn func()
-		ctx, fn = context.WithTimeout(context.Background(), 1*time.Second)
+		ctx, fn = context.WithTimeout(context.Background(), 3*time.Second)
 		cancel = fn // defeat go vet warning about unused cancel func
 
 		client, store = getTestStore()
