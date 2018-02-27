@@ -82,11 +82,9 @@ type Reader struct {
 	// latency by adjusting its polling rate.
 	acceptableLatency time.Duration
 
-	// starvationLatency is the amount of latency that is acceptable when the
+	// starvationLatency is the amount of latency that is acceptable once the
 	// reader has reached the end of the stream and is "starving" for facts.
 	// This setting informs the minimum poll rate.
-	//
-	// TODO: define a reader option to set starvation latency.
 	starvationLatency time.Duration
 
 	// instantaneousLatency is the latency computed from the facts returend by
@@ -145,7 +143,6 @@ func openReader(
 	runCtx, cancel := context.WithCancel(context.Background())
 
 	accetableLatency := getAcceptableLatency(opts)
-	starvationLatency := 3 * time.Second // TODO: option
 
 	r := &Reader{
 		logger:            logger,
@@ -157,7 +154,7 @@ func openReader(
 		globalLimit:       limit,
 		adaptiveLimit:     rate.NewLimiter(rate.Every(accetableLatency), 1),
 		acceptableLatency: accetableLatency,
-		starvationLatency: starvationLatency,
+		starvationLatency: getStarvationLatency(opts),
 		averageLatency:    ewma.NewMovingAverage(averageLatencyAge),
 	}
 
