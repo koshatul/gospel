@@ -2,40 +2,33 @@ package mariadb
 
 import "github.com/jmalloc/gospel/src/internal/driver"
 
-// readerOptionKey is a custom string used to ensure that MariaDB-specific keys
+const (
+	// DefaultReadBuffer is the default read-buffer size used if no reader-specific
+	// value is set via ReadBufferSize().
+	DefaultReadBuffer = 100
+)
+
+// readerOptionKey is a custom type used to ensure that MariaDB-specific keys
 // can not clash with custom options from other systems.
-type readerOptionKey string
+type readerOptionKey int
 
-const readBufferKey readerOptionKey = "read-buffer"
-
-// DefaultReadBuffer is the default read-buffer size used if no reader-specific
-// value is set via ReadBufferSize().
-const DefaultReadBuffer = 100
+const (
+	readBufferKey readerOptionKey = iota
+)
 
 // ReadBufferSize is a reader option that sets the number of facts to buffer
 // in memory before a call to Next().
-func ReadBufferSize(n int) driver.ReaderOption {
-	if n < 0 {
-		panic("read buffer size can not be negative")
-	}
-
+func ReadBufferSize(n uint) driver.ReaderOption {
 	return func(o *driver.ReaderOptions) {
 		o.Set(readBufferKey, n)
 	}
 }
 
-// getReadBufferSize returns the read-buffer size to use given the options o,
+// GetReadBufferSize returns the read-buffer size to use given the options o,
 // falling back to the default if necessary.
-func getReadBufferSize(o *driver.ReaderOptions) int {
+func GetReadBufferSize(o *driver.ReaderOptions) uint {
 	if v, ok := o.Get(readBufferKey); ok {
-		n := v.(int)
-
-		// lookahead at least until the 'next' fact.
-		if n < 2 {
-			return 2
-		}
-
-		return n
+		return v.(uint)
 	}
 
 	return DefaultReadBuffer

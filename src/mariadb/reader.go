@@ -151,7 +151,7 @@ func openReader(
 
 	r := &Reader{
 		logger:      logger,
-		facts:       make(chan gospel.Fact, getReadBufferSize(opts)),
+		facts:       make(chan gospel.Fact, GetReadBufferSize(opts)),
 		done:        make(chan error, 1),
 		ctx:         runCtx,
 		cancel:      cancel,
@@ -262,6 +262,11 @@ func (r *Reader) prepareStatement(
 		filter = `AND e.event_type IN (` + types + `)`
 	}
 
+	limit := GetReadBufferSize(opts)
+	if limit == 0 {
+		limit = 1
+	}
+
 	query := fmt.Sprintf(
 		`SELECT
 			f.offset,
@@ -282,7 +287,7 @@ func (r *Reader) prepareStatement(
 		filter,
 		storeID,
 		escapeString(r.addr.Stream),
-		cap(r.facts),
+		limit,
 	)
 
 	stmt, err := db.PrepareContext(ctx, query)
