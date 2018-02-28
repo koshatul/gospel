@@ -11,8 +11,8 @@ type Address struct {
 	//
 	// A special read-only stream with a zero-length name called the ε-stream
 	// (pronounced epsilon) contains facts for every event appended to the store,
-	// allowing with facts describing events within the store itself, such as
-	// the creation of new streams or the archiving of facts.
+	// along with facts describing events within the store itself, such as the
+	// creation of new streams or the archiving of facts.
 	Stream string
 
 	// Offset is the zero-based position of the fact within the stream.
