@@ -17,7 +17,7 @@ import (
 // minimise database polls. It can be seen adapting to rate changes from the
 // 'append' and 'append_unchecked' examples.
 //
-// If the GOSPEL_EXAMPLES_READRATELIMIT variable is not empty, the read rate is
+// If the GOSPEL_EXAMPLES_RATELIMIT variable is set to "true", the read rate is
 // also randimized to simulate a slow consumer.
 
 func main() {
@@ -58,7 +58,7 @@ func main() {
 	}
 
 	for {
-		if os.Getenv("GOSPEL_EXAMPLES_READRATELIMIT") != "" {
+		if os.Getenv("GOSPEL_EXAMPLES_RATELIMIT") == "true" {
 			examples.RateLimit(ctx)
 		}
 

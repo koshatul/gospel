@@ -15,7 +15,8 @@ import (
 // without using optimistic concurrency control.
 //
 // The example also mimics load spikes using a rate limiter with a randomized
-// limit.
+// limit. Rate limiting can be disabled by setting the GOSPEL_EXAMPLES_RATELIMIT
+// environment variable to "false".
 
 func main() {
 	// Open a connection to MariaDB using the GOSPEL_MARIADB_DSN environment
@@ -40,7 +41,9 @@ func main() {
 	var counter uint64
 
 	for {
-		examples.RateLimit(ctx)
+		if os.Getenv("GOSPEL_EXAMPLES_RATELIMIT") != "false" {
+			examples.RateLimit(ctx)
+		}
 
 		_, err := es.AppendUnchecked(
 			ctx,
