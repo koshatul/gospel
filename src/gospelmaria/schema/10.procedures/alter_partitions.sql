@@ -25,27 +25,28 @@ BEGIN
     -- We have to use CONVERT_TZ() because UNIX_TIMESTAMP() always assumes the
     -- string it's parsing is in the server/session timezone (even if another
     -- timezone is specified in the string).
-    SET v_threshold_curr = UNIX_TIMESTAMP(
-        CONVERT_TZ(
-            CONCAT(v_year, '-', v_month + 1, '-01 00:00:00'),
-            'UTC',
-            @@session.time_zone
-        )
+    SET v_threshold_curr = CONVERT_TZ(
+        CONCAT(v_year, '-', v_month+1, '-01 00:00:00'),
+        'UTC',
+        @@session.time_zone
     );
 
-    SET v_threshold_next = UNIX_TIMESTAMP(
-        CONVERT_TZ(
-            CONCAT(v_year, '-', v_month + 2, '-01 00:00:00'),
-            'UTC',
-            @@session.time_zone
-        )
+    SET v_threshold_next = CONVERT_TZ(
+        CONCAT(v_year, '-', v_month+2, '-01 00:00:00'),
+        'UTC',
+        @@session.time_zone
     );
+
+    IF v_threshold_curr IS NULL OR v_threshold_next IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET
+            MESSAGE_TEXT='timezone conversion failed, perhaps timezone information is not loaded';
+    END IF;
 
     PREPARE st FROM CONCAT(
         'ALTER TABLE ', p_table, '
         ADD PARTITION IF NOT EXISTS (
-            PARTITION P_', v_year, '_', LPAD(v_month+0, 2, '0'), ' VALUES LESS THAN (', v_threshold_curr, '),
-            PARTITION P_', v_year, '_', LPAD(v_month+1, 2, '0'), ' VALUES LESS THAN (', v_threshold_next, ')
+            PARTITION P_', v_year, '_', LPAD(v_month+0, 2, '0'), ' VALUES LESS THAN (', UNIX_TIMESTAMP(v_threshold_curr), '),
+            PARTITION P_', v_year, '_', LPAD(v_month+1, 2, '0'), ' VALUES LESS THAN (', UNIX_TIMESTAMP(v_threshold_next), ')
         )'
     );
     EXECUTE st;
