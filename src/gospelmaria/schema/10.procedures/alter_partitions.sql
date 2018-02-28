@@ -15,7 +15,7 @@ BEGIN
     DECLARE v_threshold_curr BIGINT;
     DECLARE v_threshold_next BIGINT;
 
-    -- v_threshold_[curr|next] are the Unix timestamps used in the range
+    -- @threshold_[curr|next] are the Unix timestamps used in the range
     -- partition for the current month and next month, respectively.
     --
     -- Note that because partitions are defined by their UPPER BOUND, the
@@ -44,19 +44,10 @@ BEGIN
     PREPARE st FROM CONCAT(
         'ALTER TABLE ', p_table, '
         ADD PARTITION IF NOT EXISTS (
-            PARTITION P_', v_year, '_', LPAD(v_month, 2, '0'), ' VALUES LESS THAN (', v_threshold_curr, ')
+            PARTITION P_', v_year, '_', LPAD(v_month+0, 2, '0'), ' VALUES LESS THAN (', v_threshold_curr, '),
+            PARTITION P_', v_year, '_', LPAD(v_month+1, 2, '0'), ' VALUES LESS THAN (', v_threshold_next, ')
         )'
     );
     EXECUTE st;
     DEALLOCATE PREPARE st;
-
-    PREPARE st FROM CONCAT(
-        'ALTER TABLE ', p_table, '
-        ADD PARTITION IF NOT EXISTS (
-            PARTITION P_', v_year, '_', LPAD(v_month + 1, 2, '0'), ' VALUES LESS THAN (', v_threshold_next, ')
-        )'
-    );
-    EXECUTE st;
-    DEALLOCATE PREPARE st;
-
 END;
