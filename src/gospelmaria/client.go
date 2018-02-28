@@ -3,7 +3,6 @@ package gospelmaria
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"os"
 
 	"github.com/go-sql-driver/mysql"
@@ -14,6 +13,9 @@ import (
 	"github.com/uber-go/multierr"
 	"golang.org/x/time/rate"
 )
+
+// DefaultDSN is the default MariaDB DSN to use if none is specified.
+const DefaultDSN = "gospel:gospel@tcp(127.0.0.1:3306)/gospel"
 
 // Client is a connection to a MariaDB server.
 //
@@ -34,7 +36,12 @@ type Client struct {
 }
 
 // Open returns a new Client instance for the given MariaDB DSN.
+// If DSN is empty, DefaultDSN is used instead.
 func Open(dsn string, opts ...gospel.Option) (*Client, error) {
+	if dsn == "" {
+		dsn = DefaultDSN
+	}
+
 	o := driver.NewClientOptions(opts)
 
 	cfg, err := mysql.ParseDSN(dsn)
@@ -83,14 +90,12 @@ func Open(dsn string, opts ...gospel.Option) (*Client, error) {
 // OpenEnv returns a new Client instance for the MariaDB DSN described by
 // the GOSPEL_MARIADB_DSN environment variable.
 //
-// If the environment variable is not set,
+// If GOSPEL_MARIADB_DSN is empty, DefaultDSN is used instead.
 func OpenEnv(opts ...gospel.Option) (*Client, error) {
-	dsn := os.Getenv("GOSPEL_MARIADB_DSN")
-	if dsn == "" {
-		return nil, errors.New("the GOSPEL_MARIADB_DSN environment variable is not set")
-	}
-
-	return Open(dsn, opts...)
+	return Open(
+		os.Getenv("GOSPEL_MARIADB_DSN"),
+		opts...,
+	)
 }
 
 // OpenStore returns an event store by name.

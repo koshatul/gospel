@@ -50,6 +50,9 @@ func getTestStore() (*gospelmaria.Client, *gospelmaria.EventStore) {
 // schema specified by getTestDSN().
 func destroyTestSchema() {
 	dsn := os.Getenv("GOSPEL_MARIADB_DSN")
+	if dsn == "" {
+		dsn = gospelmaria.DefaultDSN
+	}
 
 	cfg, err := mysql.ParseDSN(dsn)
 	if err != nil {
