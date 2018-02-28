@@ -5,6 +5,7 @@
 --
 CREATE PROCEDURE IF NOT EXISTS record_epsilon
 (
+    p_now      TIMESTAMP(6),
     p_store_id BIGINT UNSIGNED,
     p_event_id BIGINT UNSIGNED
 )
@@ -30,7 +31,8 @@ BEGIN
         store_id = p_store_id,
         stream   = "",
         offset   = v_offset,
-        event_id = p_event_id;
+        event_id = p_event_id,
+        time     = p_now;
 
     UPDATE stream SET
         next = v_offset + 1

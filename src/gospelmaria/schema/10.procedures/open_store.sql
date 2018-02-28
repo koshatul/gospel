@@ -11,6 +11,7 @@ NOT DETERMINISTIC
 MODIFIES SQL DATA
 SQL SECURITY DEFINER
 BEGIN
+    DECLARE v_now TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6);
     DECLARE v_store_id BIGINT UNSIGNED;
     DECLARE v_exists BOOLEAN DEFAULT FALSE;
 
@@ -32,7 +33,7 @@ BEGIN
             name     = "",
             next     = 0;
 
-        CALL record_store_created(v_store_id, p_store);
+        CALL record_store_created(v_now, v_store_id, p_store);
     END IF;
 
     RETURN v_store_id;

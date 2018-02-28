@@ -14,6 +14,7 @@ NOT DETERMINISTIC
 MODIFIES SQL DATA
 SQL SECURITY DEFINER
 BEGIN
+    DECLARE v_now TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6);
     DECLARE v_event_id BIGINT UNSIGNED;
     DECLARE v_offset BIGINT UNSIGNED;
 
@@ -25,6 +26,7 @@ BEGIN
     -- Record the event first, defering the locking of the stream table as late
     -- as possible.
     SET v_event_id = store_event(
+        v_now,
         p_store_id,
         p_event_type,
         p_content_type,
@@ -48,18 +50,19 @@ BEGIN
         AND name   = p_stream;
 
     IF v_offset = 0 THEN
-        CALL record_stream_created(p_store_id, p_stream);
+        CALL record_stream_created(v_now, p_store_id, p_stream);
     END IF;
 
     -- Record our fact on the ε-stream.
-    CALL record_epsilon(p_store_id, v_event_id);
+    CALL record_epsilon(v_now, p_store_id, v_event_id);
 
     -- Record our fact on the named stream.
     INSERT INTO fact SET
         store_id = p_store_id,
         stream   = p_stream,
         offset   = v_offset,
-        event_id = v_event_id;
+        event_id = v_event_id,
+        time     = v_now;
 
     RETURN v_offset;
 END;

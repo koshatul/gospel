@@ -5,6 +5,7 @@
 --
 CREATE FUNCTION IF NOT EXISTS store_event
 (
+    p_now          TIMESTAMP(6),
     p_store_id     BIGINT UNSIGNED,
     p_event_type   VARBINARY(255),
     p_content_type VARBINARY(255),
@@ -16,6 +17,7 @@ MODIFIES SQL DATA
 SQL SECURITY DEFINER
 BEGIN
     INSERT INTO event SET
+        time         = p_now,
         store_id     = p_store_id,
         event_type   = p_event_type,
         content_type = p_content_type,

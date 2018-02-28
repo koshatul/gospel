@@ -18,6 +18,7 @@ NOT DETERMINISTIC
 MODIFIES SQL DATA
 SQL SECURITY DEFINER
 BEGIN
+    DECLARE v_now TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6);
     DECLARE v_event_id BIGINT UNSIGNED;
 
     IF p_stream = "" THEN
@@ -37,7 +38,7 @@ BEGIN
                 next     = 1;
         END;
 
-        CALL record_stream_created(p_store_id, p_stream);
+        CALL record_stream_created(v_now, p_store_id, p_stream);
 
     -- Otherwise the stream must already exist at p_offset.
     ELSE
@@ -56,6 +57,7 @@ BEGIN
 
     -- Once we know our write will not conflict, we can store the event.
     SET v_event_id = store_event(
+        v_now,
         p_store_id,
         p_event_type,
         p_content_type,
@@ -63,14 +65,15 @@ BEGIN
     );
 
     -- Record a fact on the ε-stream.
-    CALL record_epsilon(p_store_id, v_event_id);
+    CALL record_epsilon(v_now, p_store_id, v_event_id);
 
     -- Record a fact on the named stream.
     INSERT INTO fact SET
         store_id = p_store_id,
         stream   = p_stream,
         offset   = p_offset,
-        event_id = v_event_id;
+        event_id = v_event_id,
+        time     = v_now;
 
     RETURN TRUE;
 END;
