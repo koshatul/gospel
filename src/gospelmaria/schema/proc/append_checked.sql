@@ -19,13 +19,42 @@ MODIFIES SQL DATA
 SQL SECURITY DEFINER
 BEGIN
     DECLARE v_event_id BIGINT UNSIGNED;
-    DECLARE v_offset BIGINT UNSIGNED;
 
     IF p_stream = "" THEN
         SIGNAL SQLSTATE '45000' SET
-            MESSAGE_TEXT='Cannot append directly to the ε-stream.';
+            MESSAGE_TEXT='cannot append directly to the ε-stream';
     END IF;
 
+    -- If p_offset = 0, we're attempting to create the stream.
+    IF p_offset = 0 THEN
+
+        BEGIN
+            DECLARE EXIT HANDLER FOR 1062 RETURN FALSE; -- 1062 = duplicate key
+
+            INSERT INTO stream SET
+                store_id = p_store_id,
+                name     = p_stream,
+                next     = 1;
+        END;
+
+        CALL record_stream_created(p_store_id, p_stream);
+
+    -- Otherwise the stream must already exist at p_offset.
+    ELSE
+
+        UPDATE stream SET
+            next = p_offset + 1
+        WHERE store_id = p_store_id
+            AND name = p_stream
+            AND next = p_offset;
+
+        IF ROW_COUNT() != 1 THEN
+            RETURN FALSE;
+        END IF;
+
+    END IF;
+
+    -- Once we know our write will not conflict, we can store the event.
     SET v_event_id = store_event(
         p_store_id,
         p_event_type,
@@ -33,25 +62,15 @@ BEGIN
         p_body
     );
 
-    SET v_offset = record_fact(
-        p_store_id,
-        p_stream,
-        v_event_id
-    );
+    -- Record a fact on the ε-stream.
+    CALL record_epsilon(p_store_id, v_event_id);
 
-    IF v_offset != p_offset THEN
-        RETURN FALSE;
-    END IF;
-
-    IF v_offset = 0 THEN
-        CALL record_stream_created(p_store_id, p_stream);
-    END IF;
-
-    SELECT record_fact(
-        p_store_id,
-        "",
-        v_event_id
-    ) INTO @_;
+    -- Record a fact on the named stream.
+    INSERT INTO fact SET
+        store_id = p_store_id,
+        stream   = p_stream,
+        offset   = p_offset,
+        event_id = v_event_id;
 
     RETURN TRUE;
 END;

@@ -99,26 +99,23 @@ func OpenEnv(opts ...gospel.Option) (*Client, error) {
 func (c *Client) OpenStore(ctx context.Context, name string) (*EventStore, error) {
 	var id int64
 
-	res, err := c.db.ExecContext(ctx, `INSERT INTO store SET name = ?`, name)
-
-	if isDuplicateEntry(err) {
-		row := c.db.QueryRowContext(ctx, `SELECT id FROM store WHERE name = ?`, name)
-		err = row.Scan(&id)
-		if err != nil {
-			return nil, err
-		}
-
-		c.logger.Debug("opened existing event store '%s'", name)
-	} else if err == nil {
-		id, err = res.LastInsertId()
-		if err != nil {
-			return nil, err
-		}
-
-		c.logger.Debug("created new event store '%s'", name)
-	} else {
+	tx, err := c.db.Begin()
+	if err != nil {
 		return nil, err
 	}
+	defer tx.Rollback()
+
+	row := tx.QueryRowContext(ctx, `SELECT open_store(?)`, name)
+
+	if err := row.Scan(&id); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	c.logger.Debug("opened '%s' event store", name)
 
 	return &EventStore{
 		c.db,

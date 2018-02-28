@@ -1,40 +1,39 @@
 --
--- record_fact unconditionally records a fact and returns its offset without
--- recording any information about new streams.
+-- record_epsilon unconditionally records a fact to the ε-stream.
 --
 -- This function is an implementation detail and should not be called by clients.
 --
-CREATE FUNCTION IF NOT EXISTS record_fact
+CREATE PROCEDURE IF NOT EXISTS record_epsilon
 (
     p_store_id BIGINT UNSIGNED,
-    p_stream   VARBINARY(255),
     p_event_id BIGINT UNSIGNED
 )
-RETURNS BIGINT UNSIGNED
 NOT DETERMINISTIC
 MODIFIES SQL DATA
 SQL SECURITY DEFINER
 BEGIN
     DECLARE v_offset BIGINT UNSIGNED;
 
-    SELECT offset + 1
+    SELECT next
         INTO v_offset
-        FROM fact
+        FROM stream
     WHERE store_id = p_store_id
-        AND stream = p_stream
-        ORDER BY offset DESC
-        LIMIT 1
+        AND name = ""
         FOR UPDATE;
 
     IF v_offset IS NULL THEN
-        SET v_offset = 0;
+        SIGNAL SQLSTATE '45000' SET
+            MESSAGE_TEXT='ε-stream does not exist';
     END IF;
 
     INSERT INTO fact SET
         store_id = p_store_id,
-        stream   = p_stream,
+        stream   = "",
         offset   = v_offset,
         event_id = p_event_id;
 
-    RETURN v_offset;
+    UPDATE stream SET
+        next = v_offset + 1
+    WHERE store_id = p_store_id
+        AND name = "";
 END;
