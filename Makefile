@@ -9,7 +9,7 @@ REQ += artifacts/mariadb/schema.go
 artifacts/make/%/Makefile:
 	curl -sf https://jmalloc.github.io/makefiles/fetch | bash /dev/stdin $*
 
-artifacts/mariadb/schema.go: $(shell find src/gospelmaria/schema -name '*.sql')
+artifacts/mariadb/schema.go: $(shell find src/gospelmaria/schema -name '*.sql' | sort)
 	@mkdir -p $(@D)
 	echo 'package schema' > "$@"
 	echo 'var Statements = `' >> "$@"
