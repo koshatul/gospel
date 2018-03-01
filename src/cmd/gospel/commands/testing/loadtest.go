@@ -135,6 +135,7 @@ func loadTestStream(
 		)
 
 		if gospel.IsConflict(err) {
+			fmt.Fprintln(w, err)
 			return nil // find a new stream
 		} else if err != nil {
 			return err
@@ -153,7 +154,7 @@ func showAppendRate(
 ) {
 	for {
 		select {
-		case <-time.After(1 * time.Second):
+		case <-time.After(2500 * time.Millisecond):
 		case <-ctx.Done():
 			return
 		}
