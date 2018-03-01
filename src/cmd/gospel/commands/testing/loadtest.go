@@ -64,28 +64,18 @@ func loadTest(
 	rc *metrics.RateCounter,
 	n int,
 ) error {
-	nameSet := map[string]struct{}{}
-	nameSlice := make([]string, 0, n)
-
-	var stream string
+	names := make([]string, n)
+	for i := 0; i < n; i++ {
+		names[i] = randomName()
+	}
 
 	for {
-		if len(nameSlice) == n {
-			stream = nameSlice[rand.Intn(n)]
-		} else {
-			stream = randomName()
-			if _, ok := nameSet[stream]; !ok {
-				nameSet[stream] = struct{}{}
-				nameSlice = append(nameSlice, stream)
-			}
-		}
-
 		if err := loadTestStream(
 			ctx,
 			w,
 			es,
 			rc,
-			stream,
+			names[rand.Intn(n)],
 		); err != nil {
 			return err
 		}

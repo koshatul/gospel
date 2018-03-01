@@ -4,6 +4,7 @@ REQ += artifacts/mariadb/schema.go
 
 -include artifacts/make/go/Makefile
 
+.PHONY: run
 run: artifacts/build/debug/$(GOOS)/$(GOARCH)/gospel
 	"$<" $(RUN_ARGS)
 
