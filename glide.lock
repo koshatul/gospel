@@ -1,12 +1,25 @@
-hash: 9611c013dd6bcdd1ec2f0102c642801383c0f0cbc0139e8de2319e117af4b575
-updated: 2018-02-27T20:58:14.89026+10:00
+hash: 61c4181365edde9b0ac75f389a28e76d04392f7d64f76306cb4589d8215aed12
+updated: 2018-03-01T07:38:55.338628004+10:00
 imports:
 - name: github.com/go-sql-driver/mysql
   version: bc14601d1bd56421dd60f561e6052c9ed77f9daf
+- name: github.com/inconshreveable/mousetrap
+  version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
+- name: github.com/jmalloc/fabricate
+  version: b3973356b3ba1cc944a5ce3bb4a9fdbf9cb1a844
+  subpackages:
+  - src/fabricate
+  - src/fabricate/internal/reflectutil
 - name: github.com/jmalloc/twelf
   version: ffe2c64ef8c5e93b1410e818808fe4fddfb5e02d
   subpackages:
   - src/twelf
+- name: github.com/spf13/cobra
+  version: 7b2c5ac9fc04fc5efafb60700713d4fa609b777b
+  subpackages:
+  - cobra
+- name: github.com/spf13/pflag
+  version: ee5fd03fd6acfd43e44aea0b4135958546ed8e73
 - name: github.com/uber-go/multierr
   version: 3c4937480c32f4c13a875a1829af76c98ca3d40a
 - name: github.com/VividCortex/ewma
