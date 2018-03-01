@@ -1,3 +1,5 @@
+MATRIX_OS := darwin linux windows
+
 REQ += artifacts/mariadb/schema.go
 
 -include artifacts/make/go/Makefile
