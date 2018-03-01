@@ -78,7 +78,7 @@ var _ = Describe("Reader", func() {
 			_, err = reader.Next(ctx)
 			Expect(err).ShouldNot(HaveOccurred())
 
-			nextCtx, cancel := context.WithTimeout(ctx, 150*time.Millisecond)
+			nextCtx, cancel := context.WithTimeout(ctx, 250*time.Millisecond)
 			defer cancel()
 
 			_, err = reader.Next(nextCtx)
