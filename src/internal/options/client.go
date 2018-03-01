@@ -1,4 +1,4 @@
-package driver
+package options
 
 import "github.com/jmalloc/twelf/src/twelf"
 

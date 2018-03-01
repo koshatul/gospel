@@ -1,8 +1,8 @@
-package driver_test
+package options_test
 
 import (
 	"github.com/jmalloc/gospel/src/gospel"
-	. "github.com/jmalloc/gospel/src/internal/driver"
+	. "github.com/jmalloc/gospel/src/internal/options"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

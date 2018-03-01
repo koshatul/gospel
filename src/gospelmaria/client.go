@@ -8,7 +8,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 	schema "github.com/jmalloc/gospel/artifacts/mariadb"
 	"github.com/jmalloc/gospel/src/gospel"
-	"github.com/jmalloc/gospel/src/internal/driver"
+	"github.com/jmalloc/gospel/src/internal/options"
 	"github.com/jmalloc/twelf/src/twelf"
 	"github.com/uber-go/multierr"
 	"golang.org/x/time/rate"
@@ -42,7 +42,7 @@ func Open(dsn string, opts ...gospel.Option) (*Client, error) {
 		dsn = DefaultDSN
 	}
 
-	o := driver.NewClientOptions(opts)
+	o := options.NewClientOptions(opts)
 
 	cfg, err := mysql.ParseDSN(dsn)
 	if err != nil {

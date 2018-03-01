@@ -10,8 +10,8 @@ import (
 
 	"github.com/VividCortex/ewma"
 	"github.com/jmalloc/gospel/src/gospel"
-	"github.com/jmalloc/gospel/src/internal/driver"
 	"github.com/jmalloc/gospel/src/internal/metrics"
+	"github.com/jmalloc/gospel/src/internal/options"
 	"github.com/jmalloc/twelf/src/twelf"
 	"golang.org/x/time/rate"
 )
@@ -105,7 +105,7 @@ type Reader struct {
 // reader is using a debug logger.
 type readerDebug struct {
 	// opts is the options specified when opening the reader.
-	opts *driver.ReaderOptions
+	opts *options.ReaderOptions
 
 	// averagePollRate keeps track of the average polling rate, which can be
 	// substantially lower than the adaptive limit for slow readers.
@@ -136,7 +136,7 @@ func openReader(
 	addr gospel.Address,
 	limit *rate.Limiter,
 	logger twelf.Logger,
-	opts *driver.ReaderOptions,
+	opts *options.ReaderOptions,
 ) (*Reader, error) {
 	// Note that runCtx is NOT derived from ctx, which is only used for the
 	// opening of the reader itself.
@@ -248,7 +248,7 @@ func (r *Reader) prepareStatement(
 	ctx context.Context,
 	db *sql.DB,
 	storeID uint64,
-	opts *driver.ReaderOptions,
+	opts *options.ReaderOptions,
 ) error {
 	filter := ""
 	if opts.FilterByEventType {

@@ -76,9 +76,11 @@ func Conflict(
 	logger twelf.Logger,
 	err gospel.ConflictError,
 ) {
+	addr, ev := err.ConflictDetails()
+
 	logger.Log(
 		"conflict appending %s at %s",
-		err.Event,
-		err.Addr,
+		ev,
+		addr,
 	)
 }

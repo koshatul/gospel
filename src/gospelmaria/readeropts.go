@@ -3,7 +3,7 @@ package gospelmaria
 import (
 	"time"
 
-	"github.com/jmalloc/gospel/src/internal/driver"
+	"github.com/jmalloc/gospel/src/internal/options"
 )
 
 const (
@@ -37,19 +37,19 @@ const (
 // in memory before a call to Next().
 //
 // The minimum read-buffer size is 2.
-func ReadBufferSize(n uint) driver.ReaderOption {
+func ReadBufferSize(n uint) options.ReaderOption {
 	if n < 2 {
 		n = 2
 	}
 
-	return func(o *driver.ReaderOptions) {
+	return func(o *options.ReaderOptions) {
 		o.Set(readBufferKey, n)
 	}
 }
 
 // getReadBufferSize returns the read-buffer size to use for the given reader
 // options, falling back to the default if necessary.
-func getReadBufferSize(o *driver.ReaderOptions) uint {
+func getReadBufferSize(o *options.ReaderOptions) uint {
 	if v, ok := o.Get(readBufferKey); ok {
 		return v.(uint)
 	}
@@ -61,19 +61,19 @@ func getReadBufferSize(o *driver.ReaderOptions) uint {
 // generally acceptable for the purposes of the reader. The reader will attempt
 // to maintain this latency by adjusting its polling rate against the average
 // latency of the delivered facts.
-func AcceptableLatency(latency time.Duration) driver.ReaderOption {
+func AcceptableLatency(latency time.Duration) options.ReaderOption {
 	if latency < 0 {
 		latency = 0
 	}
 
-	return func(o *driver.ReaderOptions) {
+	return func(o *options.ReaderOptions) {
 		o.Set(acceptableLatencyKey, latency)
 	}
 }
 
 // getAcceptableLatency returns the acceptable latency to use for the given
 // reader options, falling back to the default if necessary.
-func getAcceptableLatency(o *driver.ReaderOptions) time.Duration {
+func getAcceptableLatency(o *options.ReaderOptions) time.Duration {
 	if v, ok := o.Get(acceptableLatencyKey); ok {
 		return v.(time.Duration)
 	}
@@ -86,19 +86,19 @@ func getAcceptableLatency(o *driver.ReaderOptions) time.Duration {
 // for facts.
 //
 // The setting is ignored if latency is less than the acceptable latency value.
-func StarvationLatency(latency time.Duration) driver.ReaderOption {
+func StarvationLatency(latency time.Duration) options.ReaderOption {
 	if latency < 0 {
 		latency = 0
 	}
 
-	return func(o *driver.ReaderOptions) {
+	return func(o *options.ReaderOptions) {
 		o.Set(starvationLatencyKey, latency)
 	}
 }
 
 // getStarvationLatency returns the acceptable latency to use for the given
 // reader options, falling back to the default if necessary.
-func getStarvationLatency(o *driver.ReaderOptions) time.Duration {
+func getStarvationLatency(o *options.ReaderOptions) time.Duration {
 	acceptable := getAcceptableLatency(o)
 
 	if v, ok := o.Get(starvationLatencyKey); ok {

@@ -3,7 +3,7 @@ package gospelmaria
 import (
 	"time"
 
-	"github.com/jmalloc/gospel/src/internal/driver"
+	"github.com/jmalloc/gospel/src/internal/options"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -11,7 +11,7 @@ import (
 var _ = Describe("read-buffer size option", func() {
 	Describe("ReadBufferSize", func() {
 		It("sets the buffer size", func() {
-			opts := &driver.ReaderOptions{}
+			opts := &options.ReaderOptions{}
 
 			ReadBufferSize(10)(opts)
 
@@ -21,7 +21,7 @@ var _ = Describe("read-buffer size option", func() {
 		})
 
 		It("caps the minimum size at 2", func() {
-			opts := &driver.ReaderOptions{}
+			opts := &options.ReaderOptions{}
 			ReadBufferSize(1)(opts)
 
 			Expect(getReadBufferSize(opts)).To(
@@ -32,7 +32,7 @@ var _ = Describe("read-buffer size option", func() {
 
 	Describe("getReadBufferSize", func() {
 		It("returns the default buffer size if none is set", func() {
-			opts := &driver.ReaderOptions{}
+			opts := &options.ReaderOptions{}
 
 			Expect(getReadBufferSize(opts)).To(
 				BeNumerically("==", DefaultReadBufferSize),
@@ -44,7 +44,7 @@ var _ = Describe("read-buffer size option", func() {
 var _ = Describe("acceptable latency option", func() {
 	Describe("AcceptableLatency", func() {
 		It("sets the acceptable latency", func() {
-			opts := &driver.ReaderOptions{}
+			opts := &options.ReaderOptions{}
 
 			AcceptableLatency(10 * time.Second)(opts)
 
@@ -54,7 +54,7 @@ var _ = Describe("acceptable latency option", func() {
 		})
 
 		It("caps the minimum at zero", func() {
-			opts := &driver.ReaderOptions{}
+			opts := &options.ReaderOptions{}
 
 			AcceptableLatency(-time.Second)(opts)
 
@@ -66,7 +66,7 @@ var _ = Describe("acceptable latency option", func() {
 
 	Describe("getAcceptableLatency", func() {
 		It("returns the default latency if none is set", func() {
-			opts := &driver.ReaderOptions{}
+			opts := &options.ReaderOptions{}
 
 			Expect(getAcceptableLatency(opts)).To(
 				Equal(DefaultAcceptableLatency),
@@ -78,7 +78,7 @@ var _ = Describe("acceptable latency option", func() {
 var _ = Describe("starvation latency option", func() {
 	Describe("StarvationLatency", func() {
 		It("sets the acceptable latency", func() {
-			opts := &driver.ReaderOptions{}
+			opts := &options.ReaderOptions{}
 
 			StarvationLatency(10 * time.Second)(opts)
 
@@ -88,7 +88,7 @@ var _ = Describe("starvation latency option", func() {
 		})
 
 		It("caps the minimum at zero", func() {
-			opts := &driver.ReaderOptions{}
+			opts := &options.ReaderOptions{}
 			AcceptableLatency(0)(opts) // this is necessary for getStarvationLatency to allow 0
 
 			StarvationLatency(-time.Second)(opts)
@@ -101,7 +101,7 @@ var _ = Describe("starvation latency option", func() {
 
 	Describe("getStarvationLatency", func() {
 		It("returns the default latency if none is set", func() {
-			opts := &driver.ReaderOptions{}
+			opts := &options.ReaderOptions{}
 
 			Expect(getStarvationLatency(opts)).To(
 				Equal(DefaultAcceptableLatency * StarvationLatencyFactor),
@@ -109,7 +109,7 @@ var _ = Describe("starvation latency option", func() {
 		})
 
 		It("computes the latency from the acceptable latency if it is set", func() {
-			opts := &driver.ReaderOptions{}
+			opts := &options.ReaderOptions{}
 			AcceptableLatency(10 * time.Second)(opts)
 
 			Expect(getStarvationLatency(opts)).To(

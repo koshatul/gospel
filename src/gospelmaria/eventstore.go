@@ -5,8 +5,8 @@ import (
 	"database/sql"
 
 	"github.com/jmalloc/gospel/src/gospel"
-	"github.com/jmalloc/gospel/src/internal/driver"
 	"github.com/jmalloc/gospel/src/internal/logging"
+	"github.com/jmalloc/gospel/src/internal/options"
 	"github.com/jmalloc/twelf/src/twelf"
 	"golang.org/x/time/rate"
 )
@@ -111,7 +111,7 @@ func (es *EventStore) Open(
 		addr,
 		es.rlimit,
 		es.logger,
-		driver.NewReaderOptions(opts),
+		options.NewReaderOptions(opts),
 	)
 }
 

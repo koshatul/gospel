@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/jmalloc/gospel/src/gospel"
+	"github.com/jmalloc/gospel/src/internal/apierror"
 )
 
 // atomicAppend writes events to a stream inside a transaction using the given
@@ -69,10 +70,7 @@ func appendChecked(
 		}
 
 		if !ok {
-			return gospel.ConflictError{
-				Addr:  *addr,
-				Event: ev,
-			}
+			return apierror.NewConflict(*addr, ev)
 		}
 
 		addr.Offset++

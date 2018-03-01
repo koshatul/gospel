@@ -1,6 +1,8 @@
 package gospel
 
-import "context"
+import (
+	"context"
+)
 
 // EventStore is an interface for reading and writing streams of events.
 type EventStore interface {
@@ -32,4 +34,18 @@ type EventStore interface {
 	//
 	// ctx applies to the opening of the reader, and not to the reader itself.
 	Open(ctx context.Context, addr Address, opts ...ReaderOption) (Reader, error)
+}
+
+// IsConflict returns true if err indicates that an EventStore.Append() call
+// failed because the addr argument did not refer to the next unused offset.
+func IsConflict(err error) bool {
+	_, ok := err.(ConflictError)
+	return ok
+}
+
+// ConflictError is an interface for errors that represent a conflict.
+// Use IsConflict() to check for conflicts.
+type ConflictError interface {
+	error
+	ConflictDetails() (Address, Event)
 }

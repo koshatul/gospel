@@ -3,7 +3,7 @@ package gospel
 import (
 	"context"
 
-	"github.com/jmalloc/gospel/src/internal/driver"
+	"github.com/jmalloc/gospel/src/internal/options"
 )
 
 // Reader is an interface for reading facts from a stream in order.
@@ -32,7 +32,7 @@ type Reader interface {
 
 // ReaderOption is a function that applies a reader option to a ReaderOptions
 // struct.
-type ReaderOption = driver.ReaderOption
+type ReaderOption = options.ReaderOption
 
 // FilterByEventType is a reader option that limits the reader to facts with
 // events of a specific type.
@@ -40,7 +40,7 @@ type ReaderOption = driver.ReaderOption
 // Multiple FilterByEventType options can be combined to expand the list of
 // allowed types.
 func FilterByEventType(types ...string) ReaderOption {
-	return func(o *driver.ReaderOptions) {
+	return func(o *options.ReaderOptions) {
 		o.FilterByEventType = true
 		o.EventTypes = append(o.EventTypes, types...)
 	}

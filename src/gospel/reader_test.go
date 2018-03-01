@@ -2,14 +2,14 @@ package gospel_test
 
 import (
 	. "github.com/jmalloc/gospel/src/gospel"
-	"github.com/jmalloc/gospel/src/internal/driver"
+	"github.com/jmalloc/gospel/src/internal/options"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("FilterByEventType", func() {
 	It("enables the event type filter", func() {
-		opts := &driver.ReaderOptions{}
+		opts := &options.ReaderOptions{}
 
 		FilterByEventType("foo", "bar")(opts)
 
@@ -17,7 +17,7 @@ var _ = Describe("FilterByEventType", func() {
 	})
 
 	It("sets the event types", func() {
-		opts := &driver.ReaderOptions{}
+		opts := &options.ReaderOptions{}
 
 		FilterByEventType("foo", "bar")(opts)
 
@@ -30,7 +30,7 @@ var _ = Describe("FilterByEventType", func() {
 	})
 
 	It("is additive", func() {
-		opts := &driver.ReaderOptions{}
+		opts := &options.ReaderOptions{}
 
 		FilterByEventType("foo", "bar")(opts)
 		FilterByEventType("baz", "qux")(opts)

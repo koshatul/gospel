@@ -1,20 +1,24 @@
-package driver_test
+package options_test
 
 import (
-	. "github.com/jmalloc/gospel/src/internal/driver"
+	"github.com/jmalloc/gospel/src/gospel"
+	. "github.com/jmalloc/gospel/src/internal/options"
+	"github.com/jmalloc/twelf/src/twelf"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("NewClientOptions", func() {
-	XIt("applies the provided options", func() {
-		// opts := NewClientOptions(
-		// 	[]ClientOption{
-		// 		gospel.FilterByEventType("foo"),
-		// 	},
-		// )
-		//
-		// Expect(opts.FilterByEventType).To(BeTrue())
+	It("applies the provided options", func() {
+		l := &twelf.StandardLogger{}
+
+		opts := NewClientOptions(
+			[]ClientOption{
+				gospel.Logger(l),
+			},
+		)
+
+		Expect(opts.Logger).To(BeIdenticalTo(l))
 	})
 })
 

@@ -1,4 +1,4 @@
-package driver
+package options
 
 // ReaderOptions is a struct that contains the options applied by ReaderOption
 // functions.
