@@ -6,8 +6,8 @@ import (
 	"os"
 
 	"github.com/go-sql-driver/mysql"
-	schema "github.com/jmalloc/gospel/artifacts/mariadb"
 	"github.com/jmalloc/gospel/src/gospel"
+	"github.com/jmalloc/gospel/src/gospelmaria/schema"
 	"github.com/jmalloc/gospel/src/internal/options"
 	"github.com/jmalloc/twelf/src/twelf"
 	"github.com/uber-go/multierr"
@@ -65,7 +65,7 @@ func Open(dsn string, opts ...gospel.Option) (*Client, error) {
 		return nil, err
 	}
 
-	_, err = db.Exec(schema.Statements)
+	err = schema.Create(db)
 	if err != nil {
 		return nil, multierr.Append(
 			err,
