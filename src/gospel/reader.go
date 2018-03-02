@@ -8,7 +8,8 @@ import (
 
 // Reader is an interface for reading facts from a stream in order.
 type Reader interface {
-	// Next blocks until a fact is available for reading or ctx is canceled.
+	// Next blocks until the next fact is available for reading or ctx is
+	// canceled.
 	//
 	// If err is nil, the "current" fact is ready to be returned by Get().
 	//
@@ -20,10 +21,22 @@ type Reader interface {
 	// skipping over any facts that the reader is not interested in.
 	Next(ctx context.Context) (nx Address, err error)
 
+	// TryNext blocks until the next fact is available for reading, the end of
+	// stream is reached, or ctx is canceled.
+	//
+	// If ok is true, a new fact is available and is ready to be returned by
+	// Get(). ok is false if the current fact is the last known fact in the
+	// stream.
+	//
+	// nx is the offset within the stream that the reader has reached. It can be
+	// used to efficiently resume reading in a future call to EventStore.Open().
+	// nx is invalid if ok is false.
+	TryNext(ctx context.Context) (nx Address, ok bool, err error)
+
 	// Get returns the "current" fact.
 	//
-	// It panics if Next() has not been called.
-	// Get() returns the same Fact until Next() is called again.
+	// It panics if Next() or TryNext() has not returned successfully at least
+	// once. Get() returns the same Fact until Next() or TryNext() succeeds again.
 	Get() Fact
 
 	// Close closes the reader.

@@ -93,6 +93,38 @@ var _ = Describe("Reader", func() {
 		})
 	})
 
+	Describe("TryNext", func() {
+		It("returns the address of the next fact", func() {
+			nx, ok, err := reader.TryNext(ctx)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(ok).To(BeTrue())
+			Expect(nx).To(Equal(addr.Next()))
+		})
+
+		It("returns ok == false when the end of the stream is reached", func() {
+			_, ok, err := reader.TryNext(ctx)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(ok).To(BeTrue())
+			_, ok, err = reader.TryNext(ctx)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(ok).To(BeTrue())
+			_, ok, err = reader.TryNext(ctx)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(ok).To(BeTrue())
+
+			_, ok, err = reader.TryNext(ctx)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(ok).To(BeFalse())
+		})
+
+		It("returns an error if the reader is closed", func() {
+			reader.Close()
+
+			_, _, err := reader.TryNext(ctx)
+			Expect(err).To(MatchError("reader is closed"))
+		})
+	})
+
 	Describe("Get", func() {
 		It("returns the current fact", func() {
 			_, err := reader.Next(ctx)

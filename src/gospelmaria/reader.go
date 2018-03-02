@@ -48,6 +48,10 @@ type Reader struct {
 	// previous call to Next().
 	next *gospel.Fact
 
+	// end is a signaling channel that is closed when the database polling
+	// goroutine fetches 0 facts.
+	end chan struct{}
+
 	// done is a signaling channel which is closed when the database polling
 	// goroutine returns. The error that caused the closure, if any, is sent to
 	// the channel before it closed. This means a pending call to Next() will
@@ -147,6 +151,7 @@ func openReader(
 	r := &Reader{
 		logger:            logger,
 		facts:             make(chan gospel.Fact, getReadBufferSize(opts)),
+		end:               make(chan struct{}),
 		done:              make(chan error, 1),
 		ctx:               runCtx,
 		cancel:            cancel,
@@ -188,10 +193,33 @@ func openReader(
 // returned by Get() - it may be "further ahead" in the stream, this skipping
 // over any facts that the reader is not interested in.
 func (r *Reader) Next(ctx context.Context) (nx gospel.Address, err error) {
+	nx, _, err = r.tryNext(ctx, nil)
+	return nx, err
+}
+
+// TryNext blocks until the next fact is available for reading, the end of
+// stream is reached, or ctx is canceled.
+//
+// If ok is true, a new fact is available and is ready to be returned by
+// Get(). ok is false if the current fact is the last known fact in the
+// stream.
+//
+// nx is the offset within the stream that the reader has reached. It can be
+// used to efficiently resume reading in a future call to EventStore.Open().
+// nx is invalid if ok is false.
+func (r *Reader) TryNext(ctx context.Context) (nx gospel.Address, ok bool, err error) {
+	return r.tryNext(ctx, r.end)
+}
+
+func (r *Reader) tryNext(ctx context.Context, end <-chan struct{}) (nx gospel.Address, ok bool, err error) {
 	if r.next == nil {
 		select {
 		case f := <-r.facts:
 			r.current = &f
+			ok = true
+		case <-end:
+			// no fact is available, return with ok == false
+			return
 		case <-ctx.Done():
 			err = ctx.Err()
 			return
@@ -204,6 +232,7 @@ func (r *Reader) Next(ctx context.Context) (nx gospel.Address, err error) {
 	} else {
 		r.current = r.next
 		r.next = nil
+		ok = true
 	}
 
 	// Perform a non-blocking lookahead to see if we have the next fact already.
@@ -383,6 +412,13 @@ func (r *Reader) poll() (int, error) {
 	// TODO: this doesn't account for the time spent waiting to write to r.facts.
 	r.instantaneousLatency = now.Sub(first)
 	r.averageLatency.Add(r.instantaneousLatency.Seconds())
+
+	if count == 0 {
+		select {
+		case r.end <- struct{}{}:
+		default:
+		}
+	}
 
 	return count, nil
 }
