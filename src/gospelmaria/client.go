@@ -10,7 +10,7 @@ import (
 	"github.com/jmalloc/gospel/src/gospelmaria/schema"
 	"github.com/jmalloc/gospel/src/internal/options"
 	"github.com/jmalloc/twelf/src/twelf"
-	"github.com/uber-go/multierr"
+	"go.uber.org/multierr"
 	"golang.org/x/time/rate"
 )
 
