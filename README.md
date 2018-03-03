@@ -8,3 +8,15 @@
 
 Gospel is a minimal event store interface for Go. It currently supports MariaDB
 as a backend database.
+
+## Installation
+
+To install this package, you need to install Go and setup your Go workspace on your computer. The simplest way to install the library is to run:
+
+```
+$ go get -u github.com/jmalloc/gospel
+```
+
+## Documentation
+
+See [API documentation](https://godoc.org/github.com/jmalloc/gospel/src/gospel) for package and find examples in the [examples directory](examples/).
