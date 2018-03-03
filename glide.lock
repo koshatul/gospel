@@ -1,18 +1,24 @@
-hash: 9611c013dd6bcdd1ec2f0102c642801383c0f0cbc0139e8de2319e117af4b575
-updated: 2018-02-27T20:58:14.89026+10:00
+hash: 4f966a759e379b0385184ad1c25beb07fd3040f1594122888f13822064a8ed99
+updated: 2018-03-03T12:34:34.639457+10:00
 imports:
 - name: github.com/go-sql-driver/mysql
-  version: bc14601d1bd56421dd60f561e6052c9ed77f9daf
+  version: 5890359fb7194c7b6a139fa0ea3822a07827a675
 - name: github.com/jmalloc/twelf
   version: ffe2c64ef8c5e93b1410e818808fe4fddfb5e02d
   subpackages:
   - src/twelf
-- name: github.com/uber-go/multierr
-  version: 3c4937480c32f4c13a875a1829af76c98ca3d40a
+- name: github.com/sirupsen/logrus
+  version: d682213848ed68c0a260ca37d6dd5ace8423f5ba
 - name: github.com/VividCortex/ewma
   version: b24eb346a94c3ba12c1da1e564dbac1b498a77ce
 - name: go.uber.org/atomic
   version: 8474b86a5a6f79c443ce4b2992817ff32cf208b8
+- name: go.uber.org/multierr
+  version: 3c4937480c32f4c13a875a1829af76c98ca3d40a
+- name: golang.org/x/crypto
+  version: 8c653846df49742c4c85ec37e5d9f8d3ba657895
+  subpackages:
+  - ssh/terminal
 - name: golang.org/x/net
   version: f5dfe339be1d06f81b22525fe34671ee7d2c8904
   subpackages:
@@ -20,6 +26,11 @@ imports:
   - html
   - html/atom
   - html/charset
+- name: golang.org/x/sys
+  version: 37707fdb30a5b38865cfb95e5aab41707daec7fd
+  subpackages:
+  - unix
+  - windows
 - name: golang.org/x/time
   version: 6dc17368e09b0e8634d71cac8168d853e869a0c7
   subpackages:
@@ -63,10 +74,6 @@ testImports:
   - matchers/support/goraph/node
   - matchers/support/goraph/util
   - types
-- name: golang.org/x/sys
-  version: 37707fdb30a5b38865cfb95e5aab41707daec7fd
-  subpackages:
-  - unix
 - name: golang.org/x/text
   version: 4e4a3210bb54bb31f6ab2cdca2edcc0b50c420c1
   subpackages:
